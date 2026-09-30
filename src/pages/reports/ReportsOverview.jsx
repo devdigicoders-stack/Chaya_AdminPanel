@@ -6,7 +6,7 @@ import {
   FileText, Sparkles, ShieldCheck, Check, X, Plus, RefreshCw, 
   AlertCircle, ExternalLink, Share2, FileSpreadsheet,
   Layers, Globe, Activity, PhoneCall, HeartPulse, CreditCard, Award,
-  Loader2, TrendingUp, BarChart3, ArrowRight
+  Loader2, TrendingUp, BarChart3, ArrowRight, History
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';

@@ -73,7 +73,7 @@ export default function ScheduleMedical() {
   const handleOpenScheduleModal = (candidate) => {
     setActiveModal(candidate);
     setSelectedCenter(candidate.medicalDetails?.center || APPROVED_CENTERS[0]);
-    setSelectedDate(
+    setMedicalDate(
       candidate.medicalDetails?.appointmentDate
         ? new Date(candidate.medicalDetails.appointmentDate).toISOString().split('T')[0]
         : ''
