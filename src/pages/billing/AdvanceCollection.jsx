@@ -156,7 +156,7 @@ export default function AdvanceCollection() {
           <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-1">
             <span onClick={() => navigate('/leads')} className="hover:text-blue-600 cursor-pointer">CRM</span>
             <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
-            <span onClick={() => navigate('/billing/all')} className="hover:text-blue-600 cursor-pointer">09. Bill Book & Accounts</span>
+            <span onClick={() => navigate('/billing/all')} className="hover:text-blue-600 cursor-pointer">06. Bill Book & Accounts</span>
             <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
             <span className="text-gray-900 font-medium">Advance Collection</span>
           </div>

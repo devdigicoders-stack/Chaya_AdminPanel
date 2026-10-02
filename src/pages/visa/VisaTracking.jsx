@@ -193,7 +193,7 @@ export default function VisaTracking() {
           <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-1">
             <span onClick={() => navigate('/leads')} className="hover:text-blue-600 cursor-pointer">CRM</span>
             <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
-            <span className="text-gray-500">07. Visa Processing</span>
+            <span className="text-gray-500">08. Visa Processing</span>
             <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
             <span className="text-gray-900 font-medium">Visa Tracking</span>
           </div>
@@ -609,7 +609,7 @@ export default function VisaTracking() {
               </div>
 
               <div className="text-[11px] text-red-600 bg-red-50 p-2.5 rounded-xl border border-red-200 leading-relaxed">
-                ⚠️ Marking delayed will redirect this candidate file to <b>06. Pre-Viva Management &gt; Visa Date Change Requests</b> for candidate call consent.
+                ⚠️ Marking delayed will redirect this candidate file to <b>07. Pre-Viva Management &gt; Visa Date Change Requests</b> for candidate call consent.
               </div>
 
               <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-gray-100">

@@ -44,19 +44,19 @@ const Sidebar = ({ isOpen = false, onClose = () => {} }) => {
       setExpandedMenus(prev => ({ ...prev, '04. Interview Panel': true }));
     }
     if (currentPath.startsWith('/medical')) {
-      setExpandedMenus(prev => ({ ...prev, '05. Medical & Booking': true }));
-    }
-    if (currentPath.startsWith('/pre-viva')) {
-      setExpandedMenus(prev => ({ ...prev, '06. Pre-Viva Management': true }));
-    }
-    if (currentPath.startsWith('/visa')) {
-      setExpandedMenus(prev => ({ ...prev, '07. Visa Processing': true }));
-    }
-    if (currentPath.startsWith('/placement') || currentPath.startsWith('/viva')) {
-      setExpandedMenus(prev => ({ ...prev, '08. Viva & Placement': true }));
+      setExpandedMenus(prev => ({ ...prev, '05. Medical & GAMCA Desk': true }));
     }
     if (currentPath.startsWith('/billing')) {
-      setExpandedMenus(prev => ({ ...prev, '09. Bill Book & Accounts': true }));
+      setExpandedMenus(prev => ({ ...prev, '06. Bill Book & Accounts': true }));
+    }
+    if (currentPath.startsWith('/pre-viva')) {
+      setExpandedMenus(prev => ({ ...prev, '07. Pre-Viva Management': true }));
+    }
+    if (currentPath.startsWith('/visa')) {
+      setExpandedMenus(prev => ({ ...prev, '08. Visa Processing': true }));
+    }
+    if (currentPath.startsWith('/placement') || currentPath.startsWith('/viva')) {
+      setExpandedMenus(prev => ({ ...prev, '09. Viva & Placement': true }));
     }
     if (currentPath.startsWith('/candidates')) {
       setExpandedMenus(prev => ({ ...prev, '10. Candidates & Registry': true }));
@@ -79,13 +79,13 @@ const Sidebar = ({ isOpen = false, onClose = () => {} }) => {
 
   const menuItems = [
     { name: 'Dashboard', icon: LayoutDashboard, path: '/' },
-    { name: 'Transfer Inbox / Outbox', icon: ArrowLeftRight, path: '/transfers' },
+    { name: 'File Transfer Desk (Inbox/Outbox)', icon: ArrowLeftRight, path: '/transfers' },
     { 
       name: '01. Leads Management', 
       icon: Users, 
       path: '/leads',
       subItems: [
-        { name: 'All Leads', path: '/leads' },
+        { name: 'All Leads Pool', path: '/leads' },
         { name: 'Add New Lead', path: '/leads/add' },
         { name: 'Upload Excel / CSV', path: '/leads/import' },
         { name: 'Lead Sources (WhatsApp/FB)', path: '/leads/sources' },
@@ -98,7 +98,7 @@ const Sidebar = ({ isOpen = false, onClose = () => {} }) => {
       subItems: [
         { name: 'Distribute Leads to Staff', path: '/staff-head/assign' },
         { name: 'Change Calling Staff', path: '/staff-head/handling' },
-        { name: 'Transfer Inbox / Outbox', path: '/transfers' },
+        { name: 'Transfer Handover Desk', path: '/transfers' },
       ]
     },
     { 
@@ -120,7 +120,7 @@ const Sidebar = ({ isOpen = false, onClose = () => {} }) => {
       ]
     },
     { 
-      name: '05. Medical & Booking', 
+      name: '05. Medical & GAMCA Desk', 
       icon: HeartPulse, 
       path: '/medical/all',
       subItems: [
@@ -129,7 +129,17 @@ const Sidebar = ({ isOpen = false, onClose = () => {} }) => {
       ]
     },
     { 
-      name: '06. Pre-Viva Management', 
+      name: '06. Bill Book & Accounts', 
+      icon: FileText, 
+      path: '/billing/all',
+      subItems: [
+        { name: 'All Bills & Invoices', path: '/billing/all' },
+        { name: 'Advance Payment Collection', path: '/billing/advance' },
+        { name: 'Final Payment Collection', path: '/billing/final' },
+      ]
+    },
+    { 
+      name: '07. Pre-Viva Management', 
       icon: ClipboardCheck, 
       path: '/pre-viva/schedule',
       subItems: [
@@ -139,7 +149,7 @@ const Sidebar = ({ isOpen = false, onClose = () => {} }) => {
       ]
     },
     { 
-      name: '07. Visa Processing', 
+      name: '08. Visa Processing', 
       icon: Plane, 
       path: '/visa/apply',
       subItems: [
@@ -150,24 +160,14 @@ const Sidebar = ({ isOpen = false, onClose = () => {} }) => {
       ]
     },
     { 
-      name: '08. Viva & Placement', 
+      name: '09. Viva & Placement', 
       icon: GraduationCap, 
       path: '/placement/schedule',
       subItems: [
         { name: 'Schedule Viva Date', path: '/placement/schedule' },
         { name: 'Viva Results & Scorecards', path: '/placement/results' },
-        { name: 'Offer Letters', path: '/placement/offer' },
-        { name: 'Flight & Joining', path: '/placement/joining' },
-      ]
-    },
-    { 
-      name: '09. Bill Book & Accounts', 
-      icon: FileText, 
-      path: '/billing/all',
-      subItems: [
-        { name: 'All Bills & Invoices', path: '/billing/all' },
-        { name: 'Advance Payment Collection', path: '/billing/advance' },
-        { name: 'Final Payment Collection', path: '/billing/final' },
+        { name: 'Offer Letters & Company', path: '/placement/offer' },
+        { name: 'Flight & Joining Deployment', path: '/placement/joining' },
       ]
     },
     { 
@@ -178,7 +178,7 @@ const Sidebar = ({ isOpen = false, onClose = () => {} }) => {
         { name: 'All Registered Candidates', path: '/candidates/all' },
         { name: 'Register Candidate (Official Form)', path: '/candidates/add' },
         { name: 'Cancelled Candidates', path: '/candidates/cancelled' },
-        { name: 'Unfit & Rejected Candidates', path: '/candidates/blacklisted' },
+        { name: 'Unfit & Rejected Closures', path: '/candidates/blacklisted' },
       ]
     },
     { 
@@ -213,7 +213,6 @@ const Sidebar = ({ isOpen = false, onClose = () => {} }) => {
         { name: 'Staff Login History', path: '/users/history' },
       ]
     },
-    // { name: '14. Settings', icon: Settings, path: '/settings' },
   ];
 
   return (
