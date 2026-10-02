@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { Skeleton, TableRowSkeleton } from '../components/ui/SkeletonLoader';
 import { 
   ChevronRight, ChevronLeft, Users, PhoneCall, HeartPulse, 
   Plane, GraduationCap, Download, Plus, 
@@ -465,11 +466,11 @@ export default function Dashboard() {
               </div>
               <div className="mt-2.5">
                 <div className="text-[22px] font-black text-gray-900 leading-tight">
-                  {loading ? '...' : summary.totalLeads}
+                  {loading ? <Skeleton className="h-7 w-16" /> : summary.totalLeads}
                 </div>
                 <div className="text-[12px] font-bold text-gray-800 mt-1 truncate">Total Leads Received</div>
                 <div className="text-[10.5px] text-gray-500 mt-0.5 truncate">
-                  WP: {summary.bySource?.WHATSAPP || 0} • Excel: {summary.bySource?.EXCEL || 0}
+                  {loading ? <Skeleton className="h-3 w-28" /> : <>WP: {summary.bySource?.WHATSAPP || 0} • Excel: {summary.bySource?.EXCEL || 0}</>}
                 </div>
               </div>
             </div>
@@ -486,11 +487,11 @@ export default function Dashboard() {
               </div>
               <div className="mt-2.5">
                 <div className="text-[22px] font-black text-emerald-600 leading-tight">
-                  {loading ? '...' : (summary.byStage?.CALLING_SCREENING || 0)}
+                  {loading ? <Skeleton className="h-7 w-16" /> : (summary.byStage?.CALLING_SCREENING || 0)}
                 </div>
                 <div className="text-[12px] font-bold text-gray-800 mt-1 truncate">Passport Screening</div>
                 <div className="text-[10.5px] text-gray-500 mt-0.5 truncate">
-                  {summary.byPassport?.YES || 0} Passport Holders
+                  {loading ? <Skeleton className="h-3 w-28" /> : <>{summary.byPassport?.YES || 0} Passport Holders</>}
                 </div>
               </div>
             </div>
@@ -507,11 +508,11 @@ export default function Dashboard() {
               </div>
               <div className="mt-2.5">
                 <div className="text-[22px] font-black text-teal-600 leading-tight">
-                  {loading ? '...' : (summary.byStage?.MEDICAL_PROCESS || 0)}
+                  {loading ? <Skeleton className="h-7 w-16" /> : (summary.byStage?.MEDICAL_PROCESS || 0)}
                 </div>
                 <div className="text-[12px] font-bold text-gray-800 mt-1 truncate">Medical Desk Cases</div>
                 <div className="text-[10.5px] text-gray-500 mt-0.5 truncate">
-                  {summary.medicalSummary?.FIT || 0} FIT Approved
+                  {loading ? <Skeleton className="h-3 w-24" /> : <>{summary.medicalSummary?.FIT || 0} FIT Approved</>}
                 </div>
               </div>
             </div>
@@ -528,11 +529,11 @@ export default function Dashboard() {
               </div>
               <div className="mt-2.5">
                 <div className="text-[22px] font-black text-cyan-600 leading-tight">
-                  {loading ? '...' : ((summary.byStage?.VISA_PROCESSING || 0) + (summary.byStage?.PRE_VISA || 0))}
+                  {loading ? <Skeleton className="h-7 w-16" /> : ((summary.byStage?.VISA_PROCESSING || 0) + (summary.byStage?.PRE_VISA || 0))}
                 </div>
                 <div className="text-[12px] font-bold text-gray-800 mt-1 truncate">Visa Processing</div>
                 <div className="text-[10.5px] text-gray-500 mt-0.5 truncate">
-                  {summary.visaSummary?.APPROVED || 0} Approved Stamps
+                  {loading ? <Skeleton className="h-3 w-28" /> : <>{summary.visaSummary?.APPROVED || 0} Approved Stamps</>}
                 </div>
               </div>
             </div>
@@ -549,7 +550,7 @@ export default function Dashboard() {
               </div>
               <div className="mt-2.5">
                 <div className="text-[22px] font-black text-purple-600 leading-tight">
-                  {loading ? '...' : (summary.byStage?.COMPLETED || 0)}
+                  {loading ? <Skeleton className="h-7 w-16" /> : (summary.byStage?.COMPLETED || 0)}
                 </div>
                 <div className="text-[12px] font-bold text-gray-800 mt-1 truncate">Placed Overseas</div>
                 <div className="text-[10.5px] text-gray-500 mt-0.5 truncate">
@@ -579,7 +580,7 @@ export default function Dashboard() {
               </div>
               <div className="mt-2.5">
                 <div className="text-[22px] font-black text-emerald-700 leading-tight">
-                  {loading ? '...' : formatINR(summary.financials?.totalCollected || 0)}
+                  {loading ? <Skeleton className="h-7 w-24" /> : formatINR(summary.financials?.totalCollected || 0)}
                 </div>
                 <div className="text-[12px] font-bold text-gray-800 mt-1 truncate">Total Revenue Collected</div>
                 <div className="text-[10.5px] text-gray-500 mt-0.5 truncate">Service + Medical Fee</div>
@@ -598,7 +599,7 @@ export default function Dashboard() {
               </div>
               <div className="mt-2.5">
                 <div className="text-[22px] font-black text-blue-600 leading-tight">
-                  {loading ? '...' : formatINR(summary.financials?.totalServicePaid || 0)}
+                  {loading ? <Skeleton className="h-7 w-24" /> : formatINR(summary.financials?.totalServicePaid || 0)}
                 </div>
                 <div className="text-[12px] font-bold text-gray-800 mt-1 truncate">Service Fee Realized</div>
                 <div className="text-[10.5px] text-gray-500 mt-0.5 truncate">Agency processing fee</div>
@@ -617,7 +618,7 @@ export default function Dashboard() {
               </div>
               <div className="mt-2.5">
                 <div className="text-[22px] font-black text-teal-600 leading-tight">
-                  {loading ? '...' : formatINR(summary.financials?.totalMedicalPaid || 0)}
+                  {loading ? <Skeleton className="h-7 w-24" /> : formatINR(summary.financials?.totalMedicalPaid || 0)}
                 </div>
                 <div className="text-[12px] font-bold text-gray-800 mt-1 truncate">Medical Fee Accounted</div>
                 <div className="text-[10.5px] text-gray-500 mt-0.5 truncate">Direct medical fees</div>
@@ -636,7 +637,7 @@ export default function Dashboard() {
               </div>
               <div className="mt-2.5">
                 <div className="text-[22px] font-black text-amber-600 leading-tight">
-                  {loading ? '...' : formatINR(summary.financials?.totalPending || 0)}
+                  {loading ? <Skeleton className="h-7 w-24" /> : formatINR(summary.financials?.totalPending || 0)}
                 </div>
                 <div className="text-[12px] font-bold text-gray-800 mt-1 truncate">Pending Receivables</div>
                 <div className="text-[10.5px] text-gray-500 mt-0.5 truncate">Balance payment due</div>
@@ -655,7 +656,7 @@ export default function Dashboard() {
               </div>
               <div className="mt-2.5">
                 <div className="text-[22px] font-black text-purple-600 leading-tight">
-                  {loading ? '...' : `${summary.financials?.fullPaidCount || 0} Files`}
+                  {loading ? <Skeleton className="h-7 w-20" /> : `${summary.financials?.fullPaidCount || 0} Files`}
                 </div>
                 <div className="text-[12px] font-bold text-gray-800 mt-1 truncate">Fully Paid Candidates</div>
                 <div className="text-[10.5px] text-gray-500 mt-0.5 truncate">100% Fee cleared</div>
@@ -920,12 +921,7 @@ export default function Dashboard() {
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {loading ? (
-                    <tr>
-                      <td colSpan="5" className="py-14 text-center text-gray-400">
-                        <RefreshCw className="w-6 h-6 mx-auto mb-2 text-blue-500 animate-spin" />
-                        <span className="text-[12px]">Connecting to Live MongoDB Database...</span>
-                      </td>
-                    </tr>
+                    <TableRowSkeleton cols={5} rows={5} />
                   ) : filteredCandidates.length === 0 ? (
                     <tr>
                       <td colSpan="5" className="py-14 text-center text-gray-400">
@@ -1075,9 +1071,17 @@ export default function Dashboard() {
 
             <div className="space-y-2.5">
               {loading ? (
-                <div className="py-14 text-center text-gray-400 text-[12px]">
-                  <RefreshCw className="w-5 h-5 mx-auto mb-2 text-emerald-500 animate-spin" />
-                  <span>Loading audit stream...</span>
+                <div className="space-y-2">
+                  {[...Array(5)].map((_, i) => (
+                    <div key={i} className="flex gap-3 items-center p-3 bg-gray-50 rounded-xl">
+                      <Skeleton className="h-8 w-8" rounded="rounded-full" />
+                      <div className="flex-1 space-y-1">
+                        <Skeleton className="h-3 w-40" />
+                        <Skeleton className="h-3 w-28" />
+                      </div>
+                      <Skeleton className="h-4 w-16" rounded="rounded-full" />
+                    </div>
+                  ))}
                 </div>
               ) : recentLogs.length === 0 ? (
                 <div className="py-14 text-center text-gray-400 text-[12px]">

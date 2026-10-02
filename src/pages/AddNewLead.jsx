@@ -17,12 +17,33 @@ const steps = [
 ];
 
 const gccCountries = [
-  { label: 'Saudi Arabia 🇸🇦', value: 'Saudi Arabia' },
-  { label: 'United Arab Emirates 🇦🇪', value: 'United Arab Emirates' },
-  { label: 'Qatar 🇶🇦', value: 'Qatar' },
-  { label: 'Oman 🇴🇲', value: 'Oman' },
-  { label: 'Kuwait 🇰🇼', value: 'Kuwait' },
-  { label: 'Bahrain 🇧🇭', value: 'Bahrain' },
+  // ── GCC Countries ──
+  { label: 'Saudi Arabia 🇸🇦', value: 'Saudi Arabia', group: 'GCC' },
+  { label: 'United Arab Emirates 🇦🇪', value: 'United Arab Emirates', group: 'GCC' },
+  { label: 'Qatar 🇶🇦', value: 'Qatar', group: 'GCC' },
+  { label: 'Oman 🇴🇲', value: 'Oman', group: 'GCC' },
+  { label: 'Kuwait 🇰🇼', value: 'Kuwait', group: 'GCC' },
+  { label: 'Bahrain 🇧🇭', value: 'Bahrain', group: 'GCC' },
+  // ── Middle East ──
+  { label: 'Jordan 🇯🇴', value: 'Jordan', group: 'Middle East' },
+  { label: 'Iraq 🇮🇶', value: 'Iraq', group: 'Middle East' },
+  { label: 'Libya 🇱🇾', value: 'Libya', group: 'Middle East' },
+  { label: 'Egypt 🇪🇬', value: 'Egypt', group: 'Middle East' },
+  { label: 'Lebanon 🇱🇧', value: 'Lebanon', group: 'Middle East' },
+  // ── Asia Pacific ──
+  { label: 'Malaysia 🇲🇾', value: 'Malaysia', group: 'Asia Pacific' },
+  { label: 'Singapore 🇸🇬', value: 'Singapore', group: 'Asia Pacific' },
+  { label: 'Maldives 🇲🇻', value: 'Maldives', group: 'Asia Pacific' },
+  { label: 'Japan 🇯🇵', value: 'Japan', group: 'Asia Pacific' },
+  { label: 'South Korea 🇰🇷', value: 'South Korea', group: 'Asia Pacific' },
+  // ── Europe ──
+  { label: 'Romania 🇷🇴', value: 'Romania', group: 'Europe' },
+  { label: 'Poland 🇵🇱', value: 'Poland', group: 'Europe' },
+  { label: 'Germany 🇩🇪', value: 'Germany', group: 'Europe' },
+  { label: 'Portugal 🇵🇹', value: 'Portugal', group: 'Europe' },
+  // ── Africa ──
+  { label: 'Mauritius 🇲🇺', value: 'Mauritius', group: 'Africa' },
+  { label: 'South Africa 🇿🇦', value: 'South Africa', group: 'Africa' },
 ];
 
 const tradesList = [
@@ -830,9 +851,13 @@ export default function AddNewLead() {
                         onChange={(e) => updateForm('previousCountry', e.target.value)}
                         className={`${selectCls} pl-9`}
                       >
-                        <option value="">Select Country</option>
-                        {gccCountries.map((c) => (
-                          <option key={c.value} value={c.value}>{c.label}</option>
+                      <option value="">Select Country</option>
+                        {['GCC', 'Middle East', 'Asia Pacific', 'Europe', 'Africa'].map(group => (
+                          <optgroup key={group} label={`── ${group} ──`}>
+                            {gccCountries.filter(c => c.group === group).map((c) => (
+                              <option key={c.value} value={c.value}>{c.label}</option>
+                            ))}
+                          </optgroup>
                         ))}
                       </select>
                       <ChevronRight className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none rotate-90" />
@@ -874,7 +899,7 @@ export default function AddNewLead() {
                 {/* Target GCC Country */}
                 <div>
                   <label className={labelCls}>
-                    Target GCC Destination <span className="text-rose-500">*</span>
+                    Target Destination Country <span className="text-rose-500">*</span>
                   </label>
                   <div className="relative">
                     <Globe className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -883,8 +908,12 @@ export default function AddNewLead() {
                       onChange={(e) => updateForm('targetCountry', e.target.value)}
                       className={`${selectCls} pl-9 font-semibold`}
                     >
-                      {gccCountries.map((c) => (
-                        <option key={c.value} value={c.value}>{c.label}</option>
+                      {['GCC', 'Middle East', 'Asia Pacific', 'Europe', 'Africa'].map(group => (
+                        <optgroup key={group} label={`── ${group} ──`}>
+                          {gccCountries.filter(c => c.group === group).map((c) => (
+                            <option key={c.value} value={c.value}>{c.label}</option>
+                          ))}
+                        </optgroup>
                       ))}
                     </select>
                     <ChevronRight className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none rotate-90" />

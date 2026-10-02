@@ -206,6 +206,20 @@ export default function TransferInboxPage() {
     return name.includes(q) || id.includes(q);
   });
 
+  const formatTransferDate = (iso) => {
+    if (!iso) return <span className="text-gray-400">Recently</span>;
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return <span className="text-gray-400">Recently</span>;
+    const datePart = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    const timePart = d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+    return (
+      <div className="leading-tight">
+        <div className="font-semibold text-gray-800 text-[12px] whitespace-nowrap">{datePart}</div>
+        <div className="text-[10.5px] text-gray-400 font-mono mt-0.5 whitespace-nowrap">{timePart}</div>
+      </div>
+    );
+  };
+
   return (
     <div className="flex flex-col flex-1 pb-16 font-sans">
       {/* 1. Header */}
@@ -324,15 +338,15 @@ export default function TransferInboxPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
+            <table className="w-full text-left border-collapse text-xs min-w-[1020px]">
               <thead>
-                <tr className="bg-gray-50/80 text-gray-500 font-bold border-b border-gray-200 uppercase tracking-wider text-[10.5px]">
-                  <th className="py-3 px-4">Candidate</th>
-                  <th className="py-3 px-4">Transfer From</th>
-                  <th className="py-3 px-4">Target Role / Stage</th>
-                  <th className="py-3 px-4">Reason & Tasks</th>
-                  <th className="py-3 px-4">Requested At</th>
-                  <th className="py-3 px-4 text-center">Action</th>
+                <tr className="bg-gray-50/90 text-gray-600 font-bold border-b border-gray-200 uppercase tracking-wider text-[11px]">
+                  <th className="py-3.5 px-4 min-w-[260px]">CANDIDATE</th>
+                  <th className="py-3.5 px-4 min-w-[160px]">TRANSFER FROM</th>
+                  <th className="py-3.5 px-4 min-w-[170px]">TARGET ROLE / STAGE</th>
+                  <th className="py-3.5 px-4 min-w-[220px]">REASON & TASKS</th>
+                  <th className="py-3.5 px-4 min-w-[150px]">REQUESTED AT</th>
+                  <th className="py-3.5 px-4 text-center min-w-[180px]">ACTION</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 text-gray-700">
@@ -341,66 +355,76 @@ export default function TransferInboxPage() {
                   const isActionBusy = actionLoadingId === lead._id;
 
                   return (
-                    <tr key={lead._id} className="hover:bg-slate-50/70 transition-colors">
-                      {/* Candidate */}
-                      <td className="py-3.5 px-4">
-                        <div className="font-bold text-gray-900 text-[13px]">
+                    <tr key={lead._id} className="hover:bg-slate-50/80 transition-colors">
+                      {/* Candidate Column with Non-Breaking Elements */}
+                      <td className="py-3.5 px-4 min-w-[260px]">
+                        <div className="font-bold text-gray-900 text-[13.5px]">
                           {lead.candidateName}
                         </div>
-                        <div className="text-[11px] text-gray-500 font-mono flex items-center gap-1.5 mt-0.5">
-                          <span>{lead.leadId}</span>
-                          <span>•</span>
-                          <span>{lead.phone}</span>
-                          <span>•</span>
-                          <span className="text-blue-600 font-semibold">{lead.trade || 'General'}</span>
+                        <div className="flex items-center flex-wrap gap-1.5 mt-1">
+                          <span className="font-mono text-[11px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 shrink-0">
+                            {lead.leadId}
+                          </span>
+                          {lead.phone && (
+                            <span className="text-[11.5px] text-gray-600 font-medium shrink-0">
+                              {lead.phone}
+                            </span>
+                          )}
+                          {lead.trade && (
+                            <span className="text-[11px] text-gray-700 font-medium bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200 shrink-0">
+                              {lead.trade}
+                            </span>
+                          )}
                         </div>
                       </td>
 
-                      {/* From Staff */}
-                      <td className="py-3.5 px-4">
-                        <div className="font-semibold text-gray-800">
+                      {/* Transfer From Staff */}
+                      <td className="py-3.5 px-4 min-w-[160px] whitespace-nowrap">
+                        <div className="font-bold text-gray-900 text-[13px]">
                           {pt.fromUserName || 'System'}
                         </div>
-                        <div className="text-[11px] text-gray-500 font-mono">
-                          Current: {lead.activeHolder?.name || 'Unassigned'}
+                        <div className="text-[11.5px] text-gray-500 font-medium mt-0.5">
+                          <span className="text-gray-400">Current:</span> {lead.activeHolder?.name || 'Unassigned'}
                         </div>
                       </td>
 
-                      {/* Target Stage */}
-                      <td className="py-3.5 px-4">
-                        <span className="font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200 text-[11px]">
+                      {/* Target Stage & Role */}
+                      <td className="py-3.5 px-4 min-w-[170px] whitespace-nowrap">
+                        <span className="inline-block font-bold text-purple-700 bg-purple-50 px-2.5 py-1 rounded-md border border-purple-200 text-[11px] uppercase tracking-wide">
                           {pt.toStage?.replace(/_/g, ' ') || lead.currentStage}
                         </span>
-                        <div className="text-[11px] text-gray-500 font-mono mt-0.5">
-                          Dept: {pt.toRole || 'Desk'}
+                        <div className="text-[11.5px] text-gray-500 font-medium mt-1">
+                          <span className="text-gray-400">Dept:</span> {pt.toRole?.replace(/_/g, ' ') || 'Desk'}
                         </div>
                       </td>
 
                       {/* Reason & Tasks */}
-                      <td className="py-3.5 px-4 max-w-xs">
-                        <div className="font-semibold text-gray-800 line-clamp-1">
+                      <td className="py-3.5 px-4 min-w-[220px] max-w-sm">
+                        <div className="font-semibold text-gray-900 text-[12px] line-clamp-1">
                           {pt.reason || 'Handover for next stage processing'}
                         </div>
-                        {pt.pendingTasks && (
-                          <div className="text-[11px] text-rose-600 line-clamp-1 mt-0.5">
-                            Tasks: {pt.pendingTasks}
+                        {pt.pendingTasks ? (
+                          <div className="text-[11px] text-amber-900 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded mt-1 line-clamp-1">
+                            <span className="font-bold text-amber-700">Tasks:</span> {pt.pendingTasks}
                           </div>
+                        ) : (
+                          <div className="text-[10.5px] text-gray-400 mt-0.5">No pending checklist</div>
                         )}
                       </td>
 
-                      {/* Requested At */}
-                      <td className="py-3.5 px-4 text-gray-500 font-mono text-[11px]">
-                        {pt.requestedAt ? new Date(pt.requestedAt).toLocaleString('en-GB') : 'Recently'}
+                      {/* Requested At with Clean Formatter */}
+                      <td className="py-3.5 px-4 min-w-[150px] whitespace-nowrap">
+                        {formatTransferDate(pt.requestedAt)}
                       </td>
 
-                      {/* Action */}
-                      <td className="py-3.5 px-4 text-center">
+                      {/* Action Buttons */}
+                      <td className="py-3.5 px-4 text-center min-w-[180px] whitespace-nowrap">
                         {activeTab === 'INBOX' ? (
                           <div className="flex items-center justify-center gap-2">
                             <button
                               onClick={() => handleAccept(lead)}
                               disabled={isActionBusy}
-                              className="h-8 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
+                              className="h-8 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
                               title="Accept file and become active holder"
                             >
                               {isActionBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
@@ -427,13 +451,13 @@ export default function TransferInboxPage() {
                           </div>
                         ) : (
                           <div className="flex items-center justify-center gap-2">
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                              <Clock className="w-3 h-3 animate-pulse" />
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                              <Clock className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
                               <span>Awaiting {pt.toUserName || pt.toRole}</span>
                             </span>
                             <button
                               onClick={() => setHistoryCandidate(lead)}
-                              className="h-7 w-7 border border-gray-200 hover:bg-gray-50 text-gray-600 rounded-lg flex items-center justify-center transition-colors cursor-pointer"
+                              className="h-8 w-8 border border-gray-200 hover:bg-gray-50 text-gray-600 rounded-lg flex items-center justify-center transition-colors cursor-pointer"
                               title="View History Trail"
                             >
                               <Clock className="w-3.5 h-3.5" />
