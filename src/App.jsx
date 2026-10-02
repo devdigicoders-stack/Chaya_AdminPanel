@@ -13,6 +13,7 @@ import LeadSources from './pages/LeadSources';
 // Step 02 & Step 12: Staff Head Desk
 import LeadAssignment from './pages/staff-head/LeadAssignment';
 import StaffHeadHandling from './pages/staff-head/StaffHeadHandling';
+import TransferInboxPage from './pages/transfers/TransferInboxPage';
 
 // Steps 03-05 & Steps 13-14: Calling & Screening
 import CallingQueue from './pages/calling/CallingQueue';
@@ -98,6 +99,7 @@ function App() {
           {/* Step 02 & Step 12: Staff Head Desk */}
           <Route path="staff-head/assign" element={<LeadAssignment />} />
           <Route path="staff-head/handling" element={<StaffHeadHandling />} />
+          <Route path="transfers" element={<TransferInboxPage />} />
 
           {/* Steps 03-05 & Steps 13-14: Calling & Screening */}
           <Route path="calling/queue" element={<CallingQueue />} />

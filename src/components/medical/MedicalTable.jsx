@@ -3,7 +3,7 @@ import {
   Search, ChevronDown, Calendar as CalendarIcon, CheckCircle2, XCircle, 
   Clock, Eye, Edit3, ArrowRight, MapPin, FileCheck2, Filter, RotateCcw, 
   AlertTriangle, ShieldCheck, CreditCard, Receipt, Sparkles, X, User, Phone,
-  FileText, History, Check, Calendar, Loader2
+  FileText, History, Check, Calendar, Loader2, ArrowLeftRight
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -12,6 +12,9 @@ import {
   apiScheduleMedical,
   apiGetLeadHistory 
 } from '../../utils/api';
+import BillBookModal from '../billing/BillBookModal';
+import ConfirmationsModal from '../leads/ConfirmationsModal';
+import TransferModal from '../leads/TransferModal';
 
 const APPROVED_CENTERS = [
   'GAMCA Medical Center, Mumbai',
@@ -54,6 +57,11 @@ export default function MedicalTable({ leads = [], loading = false, onRefresh })
   const [selectedDate, setSelectedDate] = useState('');
   const [scheduleSlip, setScheduleSlip] = useState('');
   const [scheduleFee, setScheduleFee] = useState(2500);
+
+  // Modals for Bill Book, Confirmations, Transfer
+  const [billBookLead, setBillBookLead] = useState(null);
+  const [confirmationsLead, setConfirmationsLead] = useState(null);
+  const [transferLead, setTransferLead] = useState(null);
 
   // Candidate Audit Drawer
   const [drawerLead, setDrawerLead] = useState(null);
@@ -547,17 +555,35 @@ export default function MedicalTable({ leads = [], loading = false, onRefresh })
                           <span>Book Fee</span>
                         </button>
 
-                        {/* If FIT: Action to open Bill Book */}
-                        {medStatus === 'FIT' && (
-                          <button
-                            onClick={() => navigate('/billing/all')}
-                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[12px] font-semibold transition-colors flex items-center gap-1 shadow-xs cursor-pointer whitespace-nowrap hover:shadow"
-                            title="Open Bill Book & Advance Collection (Step 11)"
-                          >
-                            <span>Bill Book</span>
-                            <ArrowRight className="w-3.5 h-3.5 shrink-0" />
-                          </button>
-                        )}
+                        {/* Bill Book & Ledger Modal Button */}
+                        <button
+                          onClick={() => setBillBookLead(row)}
+                          className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-[12px] font-semibold transition-colors flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                          title="Open Candidate Bill Book & Financial Ledger"
+                        >
+                          <Receipt className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          <span>Bill Book</span>
+                        </button>
+
+                        {/* Medical Declaration & 8 Confirmations */}
+                        <button
+                          onClick={() => setConfirmationsLead(row)}
+                          className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-[12px] font-semibold transition-colors flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                          title="Confirmations: Medical Declaration & Audio/Video Proofs"
+                        >
+                          <FileText className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                          <span>Proofs</span>
+                        </button>
+
+                        {/* Transfer Handover Button */}
+                        <button
+                          onClick={() => setTransferLead(row)}
+                          className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-[12px] font-semibold transition-colors flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                          title="Handover File (Single Holder Protocol)"
+                        >
+                          <ArrowLeftRight className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                          <span>Transfer</span>
+                        </button>
 
                       </div>
                     </td>
@@ -1110,6 +1136,30 @@ export default function MedicalTable({ leads = [], loading = false, onRefresh })
           </div>
         </div>
       )}
+
+      {/* Bill Book & Financial Ledger Modal */}
+      <BillBookModal
+        isOpen={Boolean(billBookLead)}
+        onClose={() => setBillBookLead(null)}
+        lead={billBookLead}
+        onUpdated={onRefresh}
+      />
+
+      {/* 8 Mandatory Confirmations Modal */}
+      <ConfirmationsModal
+        isOpen={Boolean(confirmationsLead)}
+        onClose={() => setConfirmationsLead(null)}
+        lead={confirmationsLead}
+        onUpdated={onRefresh}
+      />
+
+      {/* Transfer Handover Modal */}
+      <TransferModal
+        isOpen={Boolean(transferLead)}
+        onClose={() => setTransferLead(null)}
+        lead={transferLead}
+        onUpdated={onRefresh}
+      />
 
     </div>
   );

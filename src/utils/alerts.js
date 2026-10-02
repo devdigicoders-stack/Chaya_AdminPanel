@@ -53,7 +53,34 @@ export const showToast = (message, icon = 'success') => {
   });
 };
 
+/**
+ * Success Alert Modal
+ */
+export const showSuccessAlert = (message, title = 'Success') => {
+  return Swal.fire({
+    icon: 'success',
+    title,
+    text: message,
+    confirmButtonColor: '#2563eb',
+    timer: 2500
+  });
+};
+
+/**
+ * Error Alert Modal
+ */
+export const showErrorAlert = (message, title = 'Error') => {
+  return Swal.fire({
+    icon: 'error',
+    title,
+    text: message,
+    confirmButtonColor: '#dc2626'
+  });
+};
+
 export default {
   confirmLogoutAlert,
-  showToast
+  showToast,
+  showSuccessAlert,
+  showErrorAlert
 };

@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Users, PhoneCall, UserCheck, HeartPulse, 
   FileText, ClipboardCheck, Plane, GraduationCap, User, 
   BarChart3, LogOut, ChevronDown, ChevronRight,
-  Sparkles, X, Settings, ShieldCheck, History } from 'lucide-react';
+  Sparkles, X, Settings, ShieldCheck, History, ArrowLeftRight, Inbox } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { getCurrentUser, getFullAvatarUrl, clearAuth } from '../../utils/api';
 import { confirmLogoutAlert, showToast } from '../../utils/alerts';
@@ -79,6 +79,7 @@ const Sidebar = ({ isOpen = false, onClose = () => {} }) => {
 
   const menuItems = [
     { name: 'Dashboard', icon: LayoutDashboard, path: '/' },
+    { name: 'Transfer Inbox / Outbox', icon: ArrowLeftRight, path: '/transfers' },
     { 
       name: '01. Leads Management', 
       icon: Users, 
@@ -97,6 +98,7 @@ const Sidebar = ({ isOpen = false, onClose = () => {} }) => {
       subItems: [
         { name: 'Distribute Leads to Staff', path: '/staff-head/assign' },
         { name: 'Change Calling Staff', path: '/staff-head/handling' },
+        { name: 'Transfer Inbox / Outbox', path: '/transfers' },
       ]
     },
     { 

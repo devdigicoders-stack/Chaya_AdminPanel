@@ -8,6 +8,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import { apiGetLeads, apiRecordPaymentBooking, apiRecordFinalPayment } from '../../utils/api';
+import BillBookModal from '../../components/billing/BillBookModal';
 
 export default function AllInvoices() {
   const navigate = useNavigate();
@@ -24,6 +25,7 @@ export default function AllInvoices() {
 
   // Modals
   const [viewInvoiceLead, setViewInvoiceLead] = useState(null);
+  const [billBookLead, setBillBookLead] = useState(null);
   const [paymentModalLead, setPaymentModalLead] = useState(null);
   const [paymentForm, setPaymentForm] = useState({
     amount: '',
@@ -545,6 +547,16 @@ export default function AllInvoices() {
                             </button>
                           )}
 
+                          {/* Official Bill Book Ledger & Verification */}
+                          <button
+                            onClick={() => setBillBookLead(lead)}
+                            className="h-7 px-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer shadow-xs"
+                            title="Official Bill Book Ledger & Receipt Verification"
+                          >
+                            <Receipt className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Ledger</span>
+                          </button>
+
                           {/* View Invoice Dossier */}
                           <button
                             onClick={() => setViewInvoiceLead(lead)}
@@ -814,6 +826,14 @@ export default function AllInvoices() {
           </div>
         </div>
       )}
+
+      {/* 6. Official Bill Book & Financial Ledger Modal */}
+      <BillBookModal
+        isOpen={Boolean(billBookLead)}
+        onClose={() => setBillBookLead(null)}
+        lead={billBookLead}
+        onUpdated={fetchBillingLeads}
+      />
 
     </div>
   );

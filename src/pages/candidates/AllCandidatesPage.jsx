@@ -3,12 +3,18 @@ import {
   ChevronRight, Plus, Download, Users, CheckCircle2, Hourglass, 
   Briefcase, XCircle, Search, RefreshCw, Loader2, Eye, History, 
   Phone, Mail, MapPin, Building2, ShieldCheck, AlertCircle, 
-  Ban, ArrowRight, UserCheck, X, FileText, Check, PauseCircle, PlayCircle
+  Ban, ArrowRight, UserCheck, X, FileText, Check, PauseCircle, PlayCircle,
+  Receipt, ArrowLeftRight, AlertOctagon
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import { apiGetLeads, apiToggleLeadHold } from '../../utils/api';
 import LeadHistoryModal from '../../components/leads/LeadHistoryModal';
+import BillBookModal from '../../components/billing/BillBookModal';
+import ConfirmationsModal from '../../components/leads/ConfirmationsModal';
+import FileClosureModal from '../../components/leads/FileClosureModal';
+import TransferModal from '../../components/leads/TransferModal';
+import CompanyConfirmationModal from '../../components/leads/CompanyConfirmationModal';
 
 export default function AllCandidatesPage() {
   const navigate = useNavigate();
@@ -26,6 +32,11 @@ export default function AllCandidatesPage() {
   // Modals
   const [selectedCandidate, setSelectedCandidate] = useState(null);
   const [dossierCandidate, setDossierCandidate] = useState(null);
+  const [billBookCandidate, setBillBookCandidate] = useState(null);
+  const [confirmationsCandidate, setConfirmationsCandidate] = useState(null);
+  const [closureCandidate, setClosureCandidate] = useState(null);
+  const [transferCandidate, setTransferCandidate] = useState(null);
+  const [companyConfCandidate, setCompanyConfCandidate] = useState(null);
 
   // Fetch candidates from MongoDB Atlas
   const fetchCandidates = async () => {
@@ -431,9 +442,20 @@ export default function AllCandidatesPage() {
                                   HOLD
                                 </span>
                               )}
+                              {candidate.pendingTransfer?.hasPending && (
+                                <span className="px-1.5 py-0.2 rounded text-[9.5px] font-bold bg-amber-500 text-white animate-pulse">
+                                  TRANSFER PENDING
+                                </span>
+                              )}
                             </div>
                             <div className="text-[11px] text-gray-400 font-mono">
                               {candidate.passportNumber || 'No Passport'} • {candidate.phone || 'No Phone'}
+                            </div>
+                            <div className="text-[10px] text-slate-500 mt-0.5 flex items-center gap-1">
+                              <span className="font-semibold text-slate-400">File Holder:</span>
+                              <span className="font-bold text-indigo-600">
+                                {candidate.activeHolder?.name || candidate.assignedTo || 'Unassigned'}
+                              </span>
                             </div>
                           </div>
                         </div>
@@ -490,6 +512,45 @@ export default function AllCandidatesPage() {
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           
+                          {/* Handover / Transfer File */}
+                          <button
+                            onClick={() => setTransferCandidate(candidate)}
+                            className="h-7 px-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                            title="Handover File (Single Holder Protocol)"
+                          >
+                            <ArrowLeftRight className="w-3.5 h-3.5 text-indigo-600" />
+                            <span>Transfer</span>
+                          </button>
+
+                          {/* Bill Book & Ledger */}
+                          <button
+                            onClick={() => setBillBookCandidate(candidate)}
+                            className="h-7 px-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                            title="Open Official Bill Book & Ledger"
+                          >
+                            <Receipt className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Bill Book</span>
+                          </button>
+
+                          {/* 8 Mandatory Confirmations */}
+                          <button
+                            onClick={() => setConfirmationsCandidate(candidate)}
+                            className="h-7 px-2 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                            title="8 Formal Confirmations & Recordings"
+                          >
+                            <FileText className="w-3.5 h-3.5 text-purple-600" />
+                            <span>Docs</span>
+                          </button>
+
+                          {/* File Closure */}
+                          <button
+                            onClick={() => setClosureCandidate(candidate)}
+                            className="h-7 w-7 border border-rose-200 hover:bg-rose-50 text-rose-700 rounded-lg flex items-center justify-center transition-colors cursor-pointer"
+                            title="Formal Candidate File Closure & Settlement"
+                          >
+                            <AlertOctagon className="w-3.5 h-3.5 text-rose-500" />
+                          </button>
+
                           {/* Dossier Modal */}
                           <button
                             onClick={() => setDossierCandidate(candidate)}
@@ -632,6 +693,46 @@ export default function AllCandidatesPage() {
         isOpen={Boolean(selectedCandidate)}
         onClose={() => setSelectedCandidate(null)}
         candidate={selectedCandidate}
+      />
+
+      {/* 7. Bill Book & Financial Ledger Modal */}
+      <BillBookModal
+        isOpen={Boolean(billBookCandidate)}
+        onClose={() => setBillBookCandidate(null)}
+        lead={billBookCandidate}
+        onUpdated={fetchCandidates}
+      />
+
+      {/* 8. Confirmations & Proofs Modal */}
+      <ConfirmationsModal
+        isOpen={Boolean(confirmationsCandidate)}
+        onClose={() => setConfirmationsCandidate(null)}
+        lead={confirmationsCandidate}
+        onUpdated={fetchCandidates}
+      />
+
+      {/* 9. File Closure Modal */}
+      <FileClosureModal
+        isOpen={Boolean(closureCandidate)}
+        onClose={() => setClosureCandidate(null)}
+        lead={closureCandidate}
+        onUpdated={fetchCandidates}
+      />
+
+      {/* 10. Transfer Handover Modal */}
+      <TransferModal
+        isOpen={Boolean(transferCandidate)}
+        onClose={() => setTransferCandidate(null)}
+        lead={transferCandidate}
+        onUpdated={fetchCandidates}
+      />
+
+      {/* 11. Step 8 Company Confirmation Modal */}
+      <CompanyConfirmationModal
+        isOpen={Boolean(companyConfCandidate)}
+        onClose={() => setCompanyConfCandidate(null)}
+        lead={companyConfCandidate}
+        onUpdated={fetchCandidates}
       />
 
     </div>

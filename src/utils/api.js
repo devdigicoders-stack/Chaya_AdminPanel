@@ -352,6 +352,7 @@ export const apiGetDashboardSummary = async () => {
 export const apiGetUsers = async () => {
   return authFetch('/auth/users');
 };
+export const apiGetStaffMembers = apiGetUsers;
 
 // 14b. Update user details (Admin only)
 export const apiUpdateUser = async (id, formDataOrObj) => {
@@ -573,6 +574,80 @@ export const apiTerminateSession = async (id) => {
 export const apiTerminateStaleSessions = async () => {
   return authFetch('/auth/login-history/terminate-stale', {
     method: 'POST'
+  });
+};
+
+// 37. Two-Party File Transfer Protocol (FRD Section 1 & 7)
+export const apiRequestTransfer = async (id, transferData) => {
+  return authFetch(`/leads/${id}/request-transfer`, {
+    method: 'POST',
+    body: JSON.stringify(transferData)
+  });
+};
+
+export const apiAcceptTransfer = async (id) => {
+  return authFetch(`/leads/${id}/accept-transfer`, {
+    method: 'POST'
+  });
+};
+
+export const apiReturnTransfer = async (id, reason) => {
+  return authFetch(`/leads/${id}/return-transfer`, {
+    method: 'POST',
+    body: JSON.stringify({ reason })
+  });
+};
+
+export const apiGetTransferInbox = async () => {
+  return authFetch('/leads/transfers/inbox');
+};
+
+export const apiGetTransferOutbox = async () => {
+  return authFetch('/leads/transfers/outbox');
+};
+
+// 38. Step 8 Company Confirmation & Proposal/Agreement (FRD Section 4, Step 8)
+export const apiUpdateCompanyConfirmation = async (id, companyData) => {
+  return authFetch(`/leads/${id}/company-confirmation`, {
+    method: 'PUT',
+    body: JSON.stringify(companyData)
+  });
+};
+
+// 39. Bill Book & Financial Ledger (FRD Section 9)
+export const apiAddBillBookTransaction = async (id, txData) => {
+  return authFetch(`/leads/${id}/billbook/transaction`, {
+    method: 'POST',
+    body: JSON.stringify(txData)
+  });
+};
+
+export const apiVerifyBillBookTransaction = async (id, receiptNo) => {
+  return authFetch(`/leads/${id}/billbook/transaction/${receiptNo}/verify`, {
+    method: 'PUT'
+  });
+};
+
+export const apiAddBillBookCharge = async (id, chargeData) => {
+  return authFetch(`/leads/${id}/billbook/charge`, {
+    method: 'POST',
+    body: JSON.stringify(chargeData)
+  });
+};
+
+// 40. 8 Mandatory Confirmations & Audio/Video Recordings (FRD Section 8)
+export const apiSaveConfirmation = async (id, confData) => {
+  return authFetch(`/leads/${id}/confirmations`, {
+    method: 'POST',
+    body: JSON.stringify(confData)
+  });
+};
+
+// 41. File Closure & Refund Settlement (FRD Section 5)
+export const apiCloseLeadFile = async (id, closeData) => {
+  return authFetch(`/leads/${id}/close-file`, {
+    method: 'PUT',
+    body: JSON.stringify(closeData)
   });
 };
 
