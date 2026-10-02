@@ -136,6 +136,7 @@ const Sidebar = ({ isOpen = false, onClose = () => {} }) => {
         { name: 'All Bills & Invoices', path: '/billing/all' },
         { name: 'Advance Payment Collection', path: '/billing/advance' },
         { name: 'Final Payment Collection', path: '/billing/final' },
+        { name: 'Refund & Settlement Desk', path: '/billing/refunds' },
       ]
     },
     { 

@@ -158,10 +158,15 @@ export default function BillBookModal({ isOpen, onClose, lead, onUpdated }) {
             </div>
             <div>
               <h2 className="text-xl font-bold tracking-tight">Official Bill Book & Ledger</h2>
-              <p className="text-xs text-blue-100 opacity-90">
-                Candidate: <span className="font-semibold text-white">{localLead.name || localLead.candidateName}</span> 
-                {localLead.candidateCode && <span className="ml-2 px-2 py-0.5 bg-blue-500/30 rounded text-[10px] font-mono">{localLead.candidateCode}</span>}
-                <span className="ml-2 font-mono">({localLead.phone})</span>
+              <p className="text-xs text-blue-100 opacity-90 flex items-center flex-wrap gap-1 mt-0.5">
+                <span>Candidate: <span className="font-semibold text-white">{localLead.name || localLead.candidateName}</span></span> 
+                {localLead.candidateCode && <span className="px-2 py-0.5 bg-blue-500/30 rounded text-[10px] font-mono">{localLead.candidateCode}</span>}
+                <span className="font-mono">({localLead.phone})</span>
+                {localLead.totalApplicationsCount > 1 && (
+                  <span className="px-2 py-0.5 bg-purple-500/40 border border-purple-300/40 rounded text-[10px] font-mono font-bold text-amber-200">
+                    CYCLE #{localLead.totalApplicationsCount} ({localLead.currentApplicationId || 'APP-01'})
+                  </span>
+                )}
               </p>
             </div>
           </div>

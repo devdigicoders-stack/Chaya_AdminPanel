@@ -31,6 +31,7 @@ import ScheduleMedical from './pages/medical/ScheduleMedical';
 import AllInvoices from './pages/billing/AllInvoices';
 import AdvanceCollection from './pages/billing/AdvanceCollection';
 import FinalPayments from './pages/billing/FinalPayments';
+import RefundSettlement from './pages/billing/RefundSettlement';
 
 // Step 15 & Delay Loop: Pre-Viva Management
 import SchedulePreViva from './pages/pre-viva/SchedulePreViva';
@@ -117,6 +118,7 @@ function App() {
           <Route path="billing/all" element={<AllInvoices />} />
           <Route path="billing/advance" element={<AdvanceCollection />} />
           <Route path="billing/final" element={<FinalPayments />} />
+          <Route path="billing/refunds" element={<RefundSettlement />} />
 
           {/* Step 15: Pre-Viva Management */}
           <Route path="pre-viva/schedule" element={<SchedulePreViva />} />

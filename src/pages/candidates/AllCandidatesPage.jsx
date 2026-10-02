@@ -4,7 +4,7 @@ import {
   Briefcase, XCircle, Search, RefreshCw, Loader2, Eye, History, 
   Phone, Mail, MapPin, Building2, ShieldCheck, AlertCircle, 
   Ban, ArrowRight, UserCheck, X, FileText, Check, PauseCircle, PlayCircle,
-  Receipt, ArrowLeftRight, AlertOctagon
+  Receipt, ArrowLeftRight, AlertOctagon, Layers
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
@@ -15,6 +15,7 @@ import ConfirmationsModal from '../../components/leads/ConfirmationsModal';
 import FileClosureModal from '../../components/leads/FileClosureModal';
 import TransferModal from '../../components/leads/TransferModal';
 import CompanyConfirmationModal from '../../components/leads/CompanyConfirmationModal';
+import ReApplyHistoryModal from '../../components/candidates/ReApplyHistoryModal';
 
 export default function AllCandidatesPage() {
   const navigate = useNavigate();
@@ -37,6 +38,7 @@ export default function AllCandidatesPage() {
   const [closureCandidate, setClosureCandidate] = useState(null);
   const [transferCandidate, setTransferCandidate] = useState(null);
   const [companyConfCandidate, setCompanyConfCandidate] = useState(null);
+  const [reapplyCandidate, setReapplyCandidate] = useState(null);
 
   // Fetch candidates from MongoDB Atlas
   const fetchCandidates = async () => {
@@ -437,6 +439,11 @@ export default function AllCandidatesPage() {
                           <div>
                             <div className="font-bold text-gray-900 flex items-center gap-1.5">
                               <span>{candidate.candidateName}</span>
+                              {candidate.totalApplicationsCount > 1 && (
+                                <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-purple-100 text-purple-800 border border-purple-200" title={`Cycle #${candidate.totalApplicationsCount} (Re-Applied)`}>
+                                  {candidate.currentApplicationId || `APP-0${candidate.totalApplicationsCount}`}
+                                </span>
+                              )}
                               {isHold && (
                                 <span className="px-1.5 py-0.2 rounded text-[9.5px] font-bold bg-amber-100 text-amber-800">
                                   HOLD
@@ -532,13 +539,28 @@ export default function AllCandidatesPage() {
                             <span>Bill Book</span>
                           </button>
 
+                          {/* Re-Apply & Multi-Application Tracking */}
+                          <button
+                            onClick={() => setReapplyCandidate(candidate)}
+                            className="h-7 px-2 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                            title="Re-Apply to New Vacancy / View Application History"
+                          >
+                            <Layers className="w-3.5 h-3.5 text-purple-600" />
+                            <span>Re-Apply</span>
+                            {candidate.totalApplicationsCount > 1 && (
+                              <span className="ml-0.5 text-[9px] px-1 py-0.2 rounded-full bg-purple-600 text-white font-bold">
+                                {candidate.totalApplicationsCount}
+                              </span>
+                            )}
+                          </button>
+
                           {/* 8 Mandatory Confirmations */}
                           <button
                             onClick={() => setConfirmationsCandidate(candidate)}
-                            className="h-7 px-2 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                            className="h-7 px-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
                             title="8 Formal Confirmations & Recordings"
                           >
-                            <FileText className="w-3.5 h-3.5 text-purple-600" />
+                            <FileText className="w-3.5 h-3.5 text-blue-600" />
                             <span>Docs</span>
                           </button>
 
@@ -732,6 +754,14 @@ export default function AllCandidatesPage() {
         isOpen={Boolean(companyConfCandidate)}
         onClose={() => setCompanyConfCandidate(null)}
         lead={companyConfCandidate}
+        onUpdated={fetchCandidates}
+      />
+
+      {/* 12. Re-Apply & Multi-Application Tracking Modal */}
+      <ReApplyHistoryModal
+        isOpen={Boolean(reapplyCandidate)}
+        onClose={() => setReapplyCandidate(null)}
+        lead={reapplyCandidate}
         onUpdated={fetchCandidates}
       />
 

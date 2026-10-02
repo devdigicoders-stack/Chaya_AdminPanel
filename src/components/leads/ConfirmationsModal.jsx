@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { 
-  X, FileText, Mic, Video, UploadCloud, Trash2, Loader2, CheckCircle2, ExternalLink, Check 
+  X, FileText, Mic, Video, UploadCloud, Trash2, Loader2, CheckCircle2, ExternalLink, Check, Download, FileDown, Sparkles, Printer 
 } from 'lucide-react';
 import { apiSaveConfirmation, apiUploadLeadMedia, resolveMediaUrl, getCurrentUser, apiGetLeadById } from '../../utils/api';
 import { showSuccessAlert, showErrorAlert } from '../../utils/alerts';
+import { generateConfirmationPdf } from '../../utils/confirmationPdfGenerator';
 
 const CONFIRMATION_TEMPLATES = [
   { docType: 'VISA_CATEGORY_SELECTION', title: '1. Visa Category Selection Confirmation', desk: 'Calling Desk' },
@@ -24,6 +25,7 @@ export default function ConfirmationsModal({ isOpen, onClose, lead, onUpdated })
   const [selectedDoc, setSelectedDoc] = useState(null);
   const [loading, setLoading] = useState(false);
   const [quickSavingDocType, setQuickSavingDocType] = useState(null);
+  const [generatingPdfDocType, setGeneratingPdfDocType] = useState(null);
 
   useEffect(() => {
     setLocalLead(lead);
@@ -57,6 +59,46 @@ export default function ConfirmationsModal({ isOpen, onClose, lead, onUpdated })
       console.error('Failed to refresh local lead confirmations:', err);
     }
     if (onUpdated) onUpdated();
+  };
+
+  const handleAutoGeneratePdf = async (tmpl, e) => {
+    if (e) e.stopPropagation();
+    setGeneratingPdfDocType(tmpl.docType);
+    try {
+      // 1. Generate & download in browser
+      const result = generateConfirmationPdf(localLead, tmpl, { download: true, returnBlob: true });
+      
+      // 2. Upload generated blob as official file
+      const pdfFile = new File([result.blob], result.fileName, { type: 'application/pdf' });
+      const uploadRes = await apiUploadLeadMedia(
+        localLead._id, 
+        pdfFile, 
+        `${tmpl.title} - Official Letterhead Confirmation`, 
+        'Confirmation Document'
+      );
+      const uploadedUrl = uploadRes.data?.fileUrl || uploadRes.fileUrl || '';
+
+      // 3. Auto-save confirmation with new PDF url
+      const existing = confirmationsList.find(c => c.docType === tmpl.docType);
+      await apiSaveConfirmation(localLead._id, {
+        docType: tmpl.docType,
+        title: tmpl.title,
+        status: existing?.status === 'CLIENT_CONFIRMED' ? 'CLIENT_CONFIRMED' : 'SHARED',
+        sharedChannel: existing?.sharedChannel || 'WHATSAPP',
+        pdfUrl: uploadedUrl,
+        recordingUrl: existing?.recordingUrl || '',
+        recordingType: existing?.recordingType || 'CALL_RECORDING',
+        remarks: existing?.remarks || 'Auto-generated official PDF attached and downloaded.'
+      });
+
+      showSuccessAlert(`✓ Official "${tmpl.title}" PDF generated, downloaded & saved to candidate file!`);
+      await refreshLocalLead();
+    } catch (err) {
+      console.error('Failed to auto-generate confirmation PDF:', err);
+      showErrorAlert(err.message || 'Failed to auto-generate PDF');
+    } finally {
+      setGeneratingPdfDocType(null);
+    }
   };
 
   const handleQuickToggle = async (tmpl, e) => {
@@ -297,7 +339,7 @@ export default function ConfirmationsModal({ isOpen, onClose, lead, onUpdated })
                     </div>
                   )}
 
-                  <div className="mt-3 flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-700/50">
+                  <div className="mt-3 flex items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-700/50">
                     <button
                       type="button"
                       onClick={(e) => handleQuickToggle(tmpl, e)}
@@ -316,22 +358,45 @@ export default function ConfirmationsModal({ isOpen, onClose, lead, onUpdated })
                       ) : isConfirmed ? (
                         <>
                           <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>Confirmed (Tap to uncheck)</span>
+                          <span>Confirmed</span>
                         </>
                       ) : (
                         <>
                           <span className="w-3.5 h-3.5 rounded-full border border-slate-300 dark:border-slate-500 inline-block" />
-                          <span>Quick Tick Confirm</span>
+                          <span>Quick Tick</span>
                         </>
                       )}
                     </button>
 
-                    <button
-                      onClick={() => handleOpenEdit(tmpl)}
-                      className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-xs transition cursor-pointer"
-                    >
-                      {existing ? 'Upload / Edit Proof' : 'Upload / Details'}
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      {/* 1-CLICK AUTO-GENERATE OFFICIAL BRANDED PDF */}
+                      <button
+                        type="button"
+                        onClick={(e) => handleAutoGeneratePdf(tmpl, e)}
+                        disabled={generatingPdfDocType === tmpl.docType}
+                        title="1-Click: Auto-fill candidate details on official Chhaya International letterhead, download PDF & attach to case!"
+                        className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white rounded-lg text-xs font-semibold shadow-xs transition flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                      >
+                        {generatingPdfDocType === tmpl.docType ? (
+                          <>
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            <span>PDF...</span>
+                          </>
+                        ) : (
+                          <>
+                            <FileDown className="w-3 h-3" />
+                            <span>Auto PDF</span>
+                          </>
+                        )}
+                      </button>
+
+                      <button
+                        onClick={() => handleOpenEdit(tmpl)}
+                        className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-lg text-xs font-semibold shadow-xs transition cursor-pointer"
+                      >
+                        {existing ? 'Edit Proof' : 'Details'}
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
@@ -384,15 +449,47 @@ export default function ConfirmationsModal({ isOpen, onClose, lead, onUpdated })
 
                 {/* 1. PDF Document Upload */}
                 <div>
-                  <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center justify-between mb-1.5">
                     <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
                       Signed PDF Document
                     </label>
-                    {pdfUrl && (
-                      <span className="text-[10.5px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3" /> Uploaded
-                      </span>
-                    )}
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          setUploadingPdf(true);
+                          const result = generateConfirmationPdf(localLead, selectedDoc, { download: true, returnBlob: true });
+                          const pdfFile = new File([result.blob], result.fileName, { type: 'application/pdf' });
+                          const uploadRes = await apiUploadLeadMedia(
+                            localLead._id, 
+                            pdfFile, 
+                            `${selectedDoc.title} - Official Letterhead Confirmation`, 
+                            'Confirmation Document'
+                          );
+                          const uploadedUrl = uploadRes.data?.fileUrl || uploadRes.fileUrl || '';
+                          setPdfUrl(uploadedUrl);
+                          setPdfFileName(result.fileName);
+                          showSuccessAlert('✓ Official branded PDF generated, downloaded & attached!');
+                        } catch (err) {
+                          showErrorAlert(err.message || 'Failed to generate PDF');
+                        } finally {
+                          setUploadingPdf(false);
+                        }
+                      }}
+                      disabled={uploadingPdf}
+                      className="text-[11px] font-bold text-amber-700 dark:text-amber-300 bg-amber-100 hover:bg-amber-200 dark:bg-amber-900/40 dark:hover:bg-amber-900/60 px-2 py-0.5 rounded-md transition flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                      title="Auto-fill details on official letterhead & attach"
+                    >
+                      {uploadingPdf ? (
+                        <>
+                          <Loader2 className="w-3 h-3 animate-spin" /> Generating...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-3 h-3 text-amber-600 dark:text-amber-400" /> 1-Click Auto-Generate Branded PDF
+                        </>
+                      )}
+                    </button>
                   </div>
 
                   <input 

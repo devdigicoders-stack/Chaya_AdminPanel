@@ -683,4 +683,26 @@ export const apiCloseLeadFile = async (id, closeData) => {
   });
 };
 
+// 42. Refund Processing Payout (FRD Section 5 & 9)
+export const apiProcessRefundPayout = async (id, payoutData) => {
+  return authFetch(`/leads/${id}/process-refund`, {
+    method: 'POST',
+    body: JSON.stringify(payoutData)
+  });
+};
+export const apiGetRefundLeads = async (params = {}) => {
+  const query = new URLSearchParams({ refundDesk: 'true', ...params }).toString();
+  return authFetch(`/leads?${query}`);
+};
 
+// 43. Re-Apply & Multi-Application Tracking (FRD Section 6 & 11)
+export const apiReapplyCandidate = async (id, reapplyData) => {
+  return authFetch(`/leads/${id}/re-apply`, {
+    method: 'POST',
+    body: JSON.stringify(reapplyData)
+  });
+};
+
+export const apiGetCandidateApplications = async (id) => {
+  return authFetch(`/leads/${id}/applications`);
+};
