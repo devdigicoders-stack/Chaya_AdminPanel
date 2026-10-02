@@ -1,7 +1,8 @@
-import { useState, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { 
-  X, FileText, Mic, Video} from 'lucide-react';
-import { apiSaveConfirmation, apiUploadLeadMedia, getCurrentUser } from '../../utils/api';
+  X, FileText, Mic, Video, UploadCloud, Trash2, Loader2, CheckCircle2, ExternalLink, Check 
+} from 'lucide-react';
+import { apiSaveConfirmation, apiUploadLeadMedia, resolveMediaUrl, getCurrentUser, apiGetLeadById } from '../../utils/api';
 import { showSuccessAlert, showErrorAlert } from '../../utils/alerts';
 
 const CONFIRMATION_TEMPLATES = [
@@ -19,8 +20,14 @@ export default function ConfirmationsModal({ isOpen, onClose, lead, onUpdated })
   if (!isOpen || !lead) return null;
 
   const currentUser = getCurrentUser() || {};
+  const [localLead, setLocalLead] = useState(lead);
   const [selectedDoc, setSelectedDoc] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [quickSavingDocType, setQuickSavingDocType] = useState(null);
+
+  useEffect(() => {
+    setLocalLead(lead);
+  }, [lead]);
 
   // Form State for Selected Confirmation
   const [status, setStatus] = useState('GENERATED'); // 'GENERATED' | 'SHARED' | 'CLIENT_CONFIRMED'
@@ -38,7 +45,51 @@ export default function ConfirmationsModal({ isOpen, onClose, lead, onUpdated })
   const fileInputRefPdf = useRef(null);
   const fileInputRefMedia = useRef(null);
 
-  const confirmationsList = lead.confirmations || [];
+  const confirmationsList = localLead?.confirmations || [];
+
+  const refreshLocalLead = async () => {
+    try {
+      const res = await apiGetLeadById(localLead._id);
+      if (res?.data) {
+        setLocalLead(res.data);
+      }
+    } catch (err) {
+      console.error('Failed to refresh local lead confirmations:', err);
+    }
+    if (onUpdated) onUpdated();
+  };
+
+  const handleQuickToggle = async (tmpl, e) => {
+    e.stopPropagation();
+    const existing = confirmationsList.find(c => c.docType === tmpl.docType);
+    const currentlyConfirmed = existing?.status === 'CLIENT_CONFIRMED';
+    const nextStatus = currentlyConfirmed ? 'GENERATED' : 'CLIENT_CONFIRMED';
+
+    setQuickSavingDocType(tmpl.docType);
+    try {
+      await apiSaveConfirmation(localLead._id, {
+        docType: tmpl.docType,
+        title: tmpl.title,
+        status: nextStatus,
+        sharedChannel: existing?.sharedChannel || 'WHATSAPP',
+        pdfUrl: existing?.pdfUrl || '',
+        recordingUrl: existing?.recordingUrl || '',
+        recordingType: existing?.recordingType || 'CALL_RECORDING',
+        remarks: existing?.remarks || (nextStatus === 'CLIENT_CONFIRMED' ? 'Marked confirmed via 1-click quick tick' : '')
+      });
+
+      showSuccessAlert(
+        nextStatus === 'CLIENT_CONFIRMED' 
+          ? `✓ "${tmpl.title}" marked as Confirmed!` 
+          : `"${tmpl.title}" set back to Generated.`
+      );
+      await refreshLocalLead();
+    } catch (err) {
+      showErrorAlert(err.message || 'Failed to update confirmation status');
+    } finally {
+      setQuickSavingDocType(null);
+    }
+  };
 
   const handleOpenEdit = (template) => {
     const existing = confirmationsList.find(c => c.docType === template.docType);
@@ -67,7 +118,7 @@ export default function ConfirmationsModal({ isOpen, onClose, lead, onUpdated })
     if (!file) return;
     setUploadingPdf(true);
     try {
-      const res = await apiUploadLeadMedia(lead._id, file, `${selectedDoc?.title || 'Document'} - Signed PDF`, 'Confirmation Document');
+      const res = await apiUploadLeadMedia(localLead._id, file, `${selectedDoc?.title || 'Document'} - Signed PDF`, 'Confirmation Document');
       const url = res.data?.fileUrl || res.fileUrl || '';
       setPdfUrl(url);
       setPdfFileName(file.name);
@@ -85,7 +136,7 @@ export default function ConfirmationsModal({ isOpen, onClose, lead, onUpdated })
     if (!file) return;
     setUploadingMedia(true);
     try {
-      const res = await apiUploadLeadMedia(lead._id, file, `${selectedDoc?.title || 'Recording'} - Evidence Media`, 'Confirmation Recording');
+      const res = await apiUploadLeadMedia(localLead._id, file, `${selectedDoc?.title || 'Recording'} - Evidence Media`, 'Confirmation Recording');
       const url = res.data?.fileUrl || res.fileUrl || '';
       setRecordingUrl(url);
       setMediaFileName(file.name);
@@ -110,7 +161,7 @@ export default function ConfirmationsModal({ isOpen, onClose, lead, onUpdated })
 
     setLoading(true);
     try {
-      await apiSaveConfirmation(lead._id, {
+      await apiSaveConfirmation(localLead._id, {
         docType: selectedDoc.docType,
         title: selectedDoc.title,
         status,
@@ -122,7 +173,7 @@ export default function ConfirmationsModal({ isOpen, onClose, lead, onUpdated })
       });
       showSuccessAlert(`Confirmation "${selectedDoc.title}" updated successfully!`);
       setSelectedDoc(null);
-      if (onUpdated) onUpdated();
+      await refreshLocalLead();
     } catch (err) {
       showErrorAlert(err.message || 'Failed to save confirmation');
     } finally {
@@ -170,23 +221,46 @@ export default function ConfirmationsModal({ isOpen, onClose, lead, onUpdated })
                   key={tmpl.docType}
                   className={`p-4 rounded-xl border transition-all ${
                     isConfirmed 
-                      ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-800' 
+                      ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-800 shadow-xs' 
                       : isShared
                       ? 'bg-blue-50/50 dark:bg-blue-950/20 border-blue-300 dark:border-blue-800'
                       : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
                   }`}
                 >
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                        {tmpl.desk}
-                      </span>
-                      <h4 className="text-xs font-bold text-slate-900 dark:text-white mt-0.5">
-                        {tmpl.title}
-                      </h4>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      {/* 1-CLICK QUICK TICK BUTTON */}
+                      <button
+                        type="button"
+                        onClick={(e) => handleQuickToggle(tmpl, e)}
+                        disabled={quickSavingDocType === tmpl.docType}
+                        title={isConfirmed ? "Confirmed! Click to uncheck" : "Click to mark as Confirmed"}
+                        className={`mt-0.5 w-6 h-6 rounded-lg flex items-center justify-center transition-all shrink-0 border cursor-pointer ${
+                          quickSavingDocType === tmpl.docType
+                            ? 'bg-slate-100 dark:bg-slate-700 border-slate-300 text-slate-400'
+                            : isConfirmed
+                            ? 'bg-emerald-600 border-emerald-600 text-white shadow-xs hover:bg-emerald-700 hover:scale-105 active:scale-95'
+                            : 'bg-white dark:bg-slate-700 border-slate-300 dark:border-slate-600 text-slate-300 hover:border-emerald-500 hover:text-emerald-500 hover:scale-105 active:scale-95'
+                        }`}
+                      >
+                        {quickSavingDocType === tmpl.docType ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600" />
+                        ) : (
+                          <Check className={`w-4 h-4 stroke-[3] ${isConfirmed ? 'opacity-100 text-white' : 'opacity-0 hover:opacity-100'}`} />
+                        )}
+                      </button>
+
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                          {tmpl.desk}
+                        </span>
+                        <h4 className="text-xs font-bold text-slate-900 dark:text-white mt-0.5">
+                          {tmpl.title}
+                        </h4>
+                      </div>
                     </div>
 
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${
                       isConfirmed
                         ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'
                         : isShared
@@ -223,12 +297,40 @@ export default function ConfirmationsModal({ isOpen, onClose, lead, onUpdated })
                     </div>
                   )}
 
-                  <div className="mt-3 flex justify-end">
+                  <div className="mt-3 flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-700/50">
+                    <button
+                      type="button"
+                      onClick={(e) => handleQuickToggle(tmpl, e)}
+                      disabled={quickSavingDocType === tmpl.docType}
+                      className={`text-[11px] font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
+                        isConfirmed 
+                          ? 'text-emerald-600 hover:text-emerald-700 dark:text-emerald-400' 
+                          : 'text-slate-500 hover:text-emerald-600 dark:text-slate-400'
+                      }`}
+                    >
+                      {quickSavingDocType === tmpl.docType ? (
+                        <>
+                          <Loader2 className="w-3 h-3 animate-spin text-indigo-600" />
+                          <span>Saving...</span>
+                        </>
+                      ) : isConfirmed ? (
+                        <>
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Confirmed (Tap to uncheck)</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="w-3.5 h-3.5 rounded-full border border-slate-300 dark:border-slate-500 inline-block" />
+                          <span>Quick Tick Confirm</span>
+                        </>
+                      )}
+                    </button>
+
                     <button
                       onClick={() => handleOpenEdit(tmpl)}
-                      className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-xs transition"
+                      className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-xs transition cursor-pointer"
                     >
-                      {existing ? 'Update Status / Links' : 'Record Confirmation'}
+                      {existing ? 'Upload / Edit Proof' : 'Upload / Details'}
                     </button>
                   </div>
                 </div>
