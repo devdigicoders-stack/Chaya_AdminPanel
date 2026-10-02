@@ -140,13 +140,31 @@ export default function MedicalTable({ leads = [], loading = false, onRefresh })
     e.preventDefault();
     if (!paymentModal) return;
 
+    const sf = Number(serviceFeeInput) || 0;
+    const sp = Number(servicePaidInput) || 0;
+    const mf = Number(medicalFeeInput) || 0;
+    const mp = Number(medicalPaidInput) || 0;
+
+    if (sf < 0 || sp < 0 || mf < 0 || mp < 0) {
+      alert('Fee and paid amounts cannot be negative.');
+      return;
+    }
+    if (sp > sf) {
+      alert('Paid service amount cannot exceed the total service fee.');
+      return;
+    }
+    if (mp > mf) {
+      alert('Paid medical amount cannot exceed the total medical fee.');
+      return;
+    }
+
     setActionLoading(true);
     try {
       const res = await apiRecordPaymentBooking(paymentModal._id, {
-        serviceFee: Number(serviceFeeInput),
-        servicePaid: Number(servicePaidInput),
-        medicalFee: Number(medicalFeeInput),
-        medicalPaid: Number(medicalPaidInput),
+        serviceFee: sf,
+        servicePaid: sp,
+        medicalFee: mf,
+        medicalPaid: mp,
         paymentMode,
         receiptNo: paymentRef,
         remarks: paymentRemarks
@@ -799,6 +817,7 @@ export default function MedicalTable({ leads = [], loading = false, onRefresh })
                       <label className="block text-[11px] font-medium text-gray-600 mb-0.5">Total Service Fee (₹)</label>
                       <input
                         type="number"
+                        min="0"
                         value={serviceFeeInput}
                         onChange={(e) => setServiceFeeInput(e.target.value)}
                         className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-[13px] font-semibold focus:outline-none focus:border-blue-500"
@@ -808,6 +827,7 @@ export default function MedicalTable({ leads = [], loading = false, onRefresh })
                       <label className="block text-[11px] font-medium text-gray-600 mb-0.5">Amount Paid (₹)</label>
                       <input
                         type="number"
+                        min="0"
                         value={servicePaidInput}
                         onChange={(e) => setServicePaidInput(e.target.value)}
                         className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-[13px] font-semibold text-emerald-700 focus:outline-none focus:border-blue-500"
@@ -831,6 +851,7 @@ export default function MedicalTable({ leads = [], loading = false, onRefresh })
                       <label className="block text-[11px] font-medium text-gray-600 mb-0.5">Total Medical Fee (₹)</label>
                       <input
                         type="number"
+                        min="0"
                         value={medicalFeeInput}
                         onChange={(e) => setMedicalFeeInput(e.target.value)}
                         className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-[13px] font-semibold focus:outline-none focus:border-teal-500"
@@ -840,6 +861,7 @@ export default function MedicalTable({ leads = [], loading = false, onRefresh })
                       <label className="block text-[11px] font-medium text-gray-600 mb-0.5">Amount Paid (₹)</label>
                       <input
                         type="number"
+                        min="0"
                         value={medicalPaidInput}
                         onChange={(e) => setMedicalPaidInput(e.target.value)}
                         className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-[13px] font-semibold text-emerald-700 focus:outline-none focus:border-teal-500"

@@ -3,11 +3,12 @@ import {
   ChevronRight, Plus, Download, FileText, CheckCircle2, Clock, 
   AlertCircle, XCircle, Calendar, ArrowRight, ShieldCheck, 
   Globe, Sparkles, Search, RotateCcw, MapPin, RefreshCw, 
-  Loader2, Check, X, Sliders
+  Loader2, Check, X, Sliders, History
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import { apiGetLeads, apiUpdateVisaStatus } from '../../utils/api';
+import LeadHistoryModal from '../../components/leads/LeadHistoryModal';
 
 export default function AllVisas() {
   const navigate = useNavigate();
@@ -17,6 +18,7 @@ export default function AllVisas() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState('');
+  const [historyCandidate, setHistoryCandidate] = useState(null);
 
   // Filters & Search
   const [searchTerm, setSearchTerm] = useState('');
@@ -533,6 +535,15 @@ export default function AllVisas() {
                           >
                             Track
                           </button>
+
+                          <button
+                            onClick={() => setHistoryCandidate(lead)}
+                            className="h-8 px-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1"
+                            title="View Full Candidate Audit History"
+                          >
+                            <History className="w-3.5 h-3.5" />
+                            <span>History</span>
+                          </button>
                         </div>
                       </td>
 
@@ -634,6 +645,13 @@ export default function AllVisas() {
           </div>
         </div>
       )}
+
+      {/* 6. Candidate Full Lifecycle Audit Trail Modal */}
+      <LeadHistoryModal
+        isOpen={!!historyCandidate}
+        onClose={() => setHistoryCandidate(null)}
+        candidate={historyCandidate}
+      />
 
     </div>
   );

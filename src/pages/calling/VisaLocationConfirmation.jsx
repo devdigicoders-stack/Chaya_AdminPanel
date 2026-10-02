@@ -11,7 +11,8 @@ import {
   apiGetLeads,
   apiGetUsers,
   apiUpdateLocationConfirmation,
-  apiGetLeadById
+  apiGetLeadById,
+  apiGetLeadHistory
 } from '../../utils/api';
 
 const POPULAR_GULF_LOCATIONS = [
@@ -259,10 +260,16 @@ export default function VisaLocationConfirmation() {
     setDetailLoading(true);
     setDetailCandidate(lead);
     try {
-      const res = await apiGetLeadById(lead._id);
-      if (res?.data) {
-        setDetailCandidate(res.data);
-      }
+      const [leadRes, histRes] = await Promise.allSettled([
+        apiGetLeadById(lead._id),
+        apiGetLeadHistory(lead._id)
+      ]);
+      const fullLead = leadRes.status === 'fulfilled' && leadRes.value?.data ? leadRes.value.data : lead;
+      const historyEvents = histRes.status === 'fulfilled' && histRes.value?.data ? histRes.value.data : [];
+      setDetailCandidate({
+        ...fullLead,
+        history: historyEvents.length > 0 ? historyEvents : fullLead.history || []
+      });
     } catch (err) {
       console.error('Failed to load candidate details', err);
     } finally {

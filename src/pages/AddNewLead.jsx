@@ -555,7 +555,7 @@ export default function AddNewLead() {
                     <input
                       type="tel"
                       value={form.phone}
-                      onChange={(e) => updateForm('phone', e.target.value)}
+                      onChange={(e) => updateForm('phone', e.target.value.replace(/[^0-9]/g, '').slice(0, 10))}
                       placeholder="98765 43210"
                       className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-r-xl text-[13px] font-mono focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-100"
                     />
@@ -570,7 +570,7 @@ export default function AddNewLead() {
                     <input
                       type="tel"
                       value={form.altPhone}
-                      onChange={(e) => updateForm('altPhone', e.target.value)}
+                      onChange={(e) => updateForm('altPhone', e.target.value.replace(/[^0-9]/g, '').slice(0, 10))}
                       placeholder="Family or alternate phone"
                       className={`${inputCls} pl-9 font-mono`}
                     />

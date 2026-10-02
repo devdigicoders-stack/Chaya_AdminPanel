@@ -3,11 +3,12 @@ import {
   ChevronRight, Plus, Users, CheckCircle2, Clock, XCircle, 
   UserCheck, ArrowUpRight, ArrowDownRight, Award, ShieldCheck, 
   Sparkles, Search, Filter, RotateCcw, Send, Calendar as CalendarIcon,
-  RefreshCw, Loader2, AlertCircle, MapPin, Check, Sliders
+  RefreshCw, Loader2, AlertCircle, MapPin, Check, Sliders, History
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import { apiGetLeads, apiEvaluatePreViva } from '../../utils/api';
+import LeadHistoryModal from '../../components/leads/LeadHistoryModal';
 
 export default function AllPreVivas() {
   const navigate = useNavigate();
@@ -17,6 +18,7 @@ export default function AllPreVivas() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState('');
+  const [historyCandidate, setHistoryCandidate] = useState(null);
 
   // Filters & Search
   const [searchTerm, setSearchTerm] = useState('');
@@ -519,6 +521,15 @@ export default function AllPreVivas() {
                             <Sliders className="w-3 h-3 text-purple-600" />
                             <span>{score > 0 ? 'Edit Score' : 'Evaluate'}</span>
                           </button>
+
+                          <button
+                            onClick={() => setHistoryCandidate(lead)}
+                            className="h-8 px-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+                            title="View Full Candidate Audit History"
+                          >
+                            <History className="w-3.5 h-3.5" />
+                            <span>History</span>
+                          </button>
                         </div>
                       </td>
 
@@ -665,6 +676,13 @@ export default function AllPreVivas() {
           </div>
         </div>
       )}
+
+      {/* 6. Candidate Full Lifecycle Audit Trail Modal */}
+      <LeadHistoryModal
+        isOpen={!!historyCandidate}
+        onClose={() => setHistoryCandidate(null)}
+        candidate={historyCandidate}
+      />
 
     </div>
   );

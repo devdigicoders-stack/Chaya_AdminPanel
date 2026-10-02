@@ -12,7 +12,8 @@ import {
   apiGetUsers,
   apiSubmitInterviewResult,
   apiTransferLeadStage,
-  apiGetLeadById
+  apiGetLeadById,
+  apiGetLeadHistory
 } from '../../utils/api';
 
 export default function InitialInterview() {
@@ -183,10 +184,16 @@ export default function InitialInterview() {
     setDetailLoading(true);
     setDetailCandidate(candidate);
     try {
-      const res = await apiGetLeadById(candidate._id);
-      if (res?.data) {
-        setDetailCandidate(res.data);
-      }
+      const [leadRes, histRes] = await Promise.allSettled([
+        apiGetLeadById(candidate._id),
+        apiGetLeadHistory(candidate._id)
+      ]);
+      const fullLead = leadRes.status === 'fulfilled' && leadRes.value?.data ? leadRes.value.data : candidate;
+      const historyEvents = histRes.status === 'fulfilled' && histRes.value?.data ? histRes.value.data : [];
+      setDetailCandidate({
+        ...fullLead,
+        history: historyEvents.length > 0 ? historyEvents : fullLead.history || []
+      });
     } catch (err) {
       console.error('Failed to load candidate details', err);
     } finally {

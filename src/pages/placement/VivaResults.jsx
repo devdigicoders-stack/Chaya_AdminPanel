@@ -3,11 +3,12 @@ import {
   ChevronRight, CheckCircle2, XCircle, Clock, Star, Filter, Download, 
   Eye, ChevronDown, Search, RotateCcw, MapPin, Building, ArrowRight, 
   ShieldCheck, Check, Plus, FileText, Globe, Sparkles, Award, 
-  RefreshCw, AlertCircle, FileCheck, Loader2, Edit3, X, DollarSign, Calendar
+  RefreshCw, AlertCircle, FileCheck, Loader2, Edit3, X, DollarSign, Calendar, History
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import { apiGetLeads, apiSubmitPlacementVivaResult, apiIssuePlacementOfferLetter } from '../../utils/api';
+import LeadHistoryModal from '../../components/leads/LeadHistoryModal';
 
 export default function VivaResults() {
   const navigate = useNavigate();
@@ -17,6 +18,7 @@ export default function VivaResults() {
   const [loading, setLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState(null);
   const [error, setError] = useState('');
+  const [historyCandidate, setHistoryCandidate] = useState(null);
 
   // Filters & Search
   const [searchTerm, setSearchTerm] = useState('');
@@ -552,6 +554,15 @@ export default function VivaResults() {
                             <Eye className="w-3.5 h-3.5 text-gray-500" />
                           </button>
 
+                          {/* View Lifecycle Audit History */}
+                          <button
+                            onClick={() => setHistoryCandidate(lead)}
+                            className="h-7 w-7 border border-indigo-200 hover:bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center transition-colors cursor-pointer"
+                            title="View Full Candidate Audit History"
+                          >
+                            <History className="w-3.5 h-3.5" />
+                          </button>
+
                         </div>
                       </td>
 
@@ -937,6 +948,13 @@ export default function VivaResults() {
           </div>
         </div>
       )}
+
+      {/* 6. Candidate Full Lifecycle Audit Trail Modal */}
+      <LeadHistoryModal
+        isOpen={!!historyCandidate}
+        onClose={() => setHistoryCandidate(null)}
+        candidate={historyCandidate}
+      />
 
     </div>
   );
