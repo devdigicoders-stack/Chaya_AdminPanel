@@ -643,6 +643,38 @@ export const apiSaveConfirmation = async (id, confData) => {
   });
 };
 
+// 40b. Upload confirmation document/recording file
+export const apiUploadLeadMedia = async (leadId, file, docTitle = '', category = 'Confirmation') => {
+  const formData = new FormData();
+  formData.append('document', file);
+  if (docTitle) formData.append('docTitle', docTitle);
+  if (category) formData.append('category', category);
+
+  const token = getAuthToken();
+  const headers = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_BASE_URL}/leads/${leadId}/upload-document`, {
+    method: 'POST',
+    headers,
+    body: formData
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.message || 'File upload failed');
+  }
+  return data;
+};
+
+export const resolveMediaUrl = (url) => {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  return `${BACKEND_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+};
+
 // 41. File Closure & Refund Settlement (FRD Section 5)
 export const apiCloseLeadFile = async (id, closeData) => {
   return authFetch(`/leads/${id}/close-file`, {

@@ -1,9 +1,7 @@
-import React, { useState } from 'react';
+import { useState, useRef } from 'react';
 import { 
-  X, FileText, CheckCircle2, Clock, Send, Mic, Video, 
-  ExternalLink, Plus, AlertTriangle, ShieldCheck
-} from 'lucide-react';
-import { apiSaveConfirmation, getCurrentUser } from '../../utils/api';
+  X, FileText, Mic, Video} from 'lucide-react';
+import { apiSaveConfirmation, apiUploadLeadMedia, getCurrentUser } from '../../utils/api';
 import { showSuccessAlert, showErrorAlert } from '../../utils/alerts';
 
 const CONFIRMATION_TEMPLATES = [
@@ -32,11 +30,21 @@ export default function ConfirmationsModal({ isOpen, onClose, lead, onUpdated })
   const [recordingType, setRecordingType] = useState('CALL_RECORDING');
   const [remarks, setRemarks] = useState('');
 
+  // File Upload State
+  const [uploadingPdf, setUploadingPdf] = useState(false);
+  const [uploadingMedia, setUploadingMedia] = useState(false);
+  const [pdfFileName, setPdfFileName] = useState('');
+  const [mediaFileName, setMediaFileName] = useState('');
+  const fileInputRefPdf = useRef(null);
+  const fileInputRefMedia = useRef(null);
+
   const confirmationsList = lead.confirmations || [];
 
   const handleOpenEdit = (template) => {
     const existing = confirmationsList.find(c => c.docType === template.docType);
     setSelectedDoc(template);
+    setPdfFileName('');
+    setMediaFileName('');
     if (existing) {
       setStatus(existing.status || 'GENERATED');
       setSharedChannel(existing.sharedChannel || 'WHATSAPP');
@@ -51,6 +59,42 @@ export default function ConfirmationsModal({ isOpen, onClose, lead, onUpdated })
       setRecordingUrl('');
       setRecordingType('CALL_RECORDING');
       setRemarks('');
+    }
+  };
+
+  const handlePdfUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingPdf(true);
+    try {
+      const res = await apiUploadLeadMedia(lead._id, file, `${selectedDoc?.title || 'Document'} - Signed PDF`, 'Confirmation Document');
+      const url = res.data?.fileUrl || res.fileUrl || '';
+      setPdfUrl(url);
+      setPdfFileName(file.name);
+      showSuccessAlert(`Document "${file.name}" uploaded successfully!`);
+    } catch (err) {
+      showErrorAlert(err.message || 'Failed to upload document');
+    } finally {
+      setUploadingPdf(false);
+      if (fileInputRefPdf.current) fileInputRefPdf.current.value = '';
+    }
+  };
+
+  const handleMediaUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingMedia(true);
+    try {
+      const res = await apiUploadLeadMedia(lead._id, file, `${selectedDoc?.title || 'Recording'} - Evidence Media`, 'Confirmation Recording');
+      const url = res.data?.fileUrl || res.fileUrl || '';
+      setRecordingUrl(url);
+      setMediaFileName(file.name);
+      showSuccessAlert(`Media "${file.name}" uploaded successfully!`);
+    } catch (err) {
+      showErrorAlert(err.message || 'Failed to upload recording media');
+    } finally {
+      setUploadingMedia(false);
+      if (fileInputRefMedia.current) fileInputRefMedia.current.value = '';
     }
   };
 
@@ -160,7 +204,7 @@ export default function ConfirmationsModal({ isOpen, onClose, lead, onUpdated })
                       {existing.pdfUrl && (
                         <div className="flex items-center space-x-1.5 text-blue-600 dark:text-blue-400">
                           <FileText className="w-3.5 h-3.5" />
-                          <a href={existing.pdfUrl} target="_blank" rel="noreferrer" className="underline truncate max-w-[200px]">
+                          <a href={resolveMediaUrl(existing.pdfUrl)} target="_blank" rel="noreferrer" className="underline truncate max-w-[200px] hover:text-blue-700">
                             View PDF Confirmation
                           </a>
                         </div>
@@ -168,8 +212,8 @@ export default function ConfirmationsModal({ isOpen, onClose, lead, onUpdated })
                       {existing.recordingUrl && (
                         <div className="flex items-center space-x-1.5 text-purple-600 dark:text-purple-400">
                           {existing.recordingType === 'VIDEO' ? <Video className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
-                          <a href={existing.recordingUrl} target="_blank" rel="noreferrer" className="underline truncate max-w-[200px]">
-                            {existing.recordingType} Proof Link
+                          <a href={resolveMediaUrl(existing.recordingUrl)} target="_blank" rel="noreferrer" className="underline truncate max-w-[200px] hover:text-purple-700">
+                            Play / Open {existing.recordingType} Proof
                           </a>
                         </div>
                       )}
@@ -236,19 +280,88 @@ export default function ConfirmationsModal({ isOpen, onClose, lead, onUpdated })
                   </select>
                 </div>
 
+                {/* 1. PDF Document Upload */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                    PDF Document URL / Link
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                      Signed PDF Document
+                    </label>
+                    {pdfUrl && (
+                      <span className="text-[10.5px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3" /> Uploaded
+                      </span>
+                    )}
+                  </div>
+
                   <input 
-                    type="url"
-                    value={pdfUrl}
-                    onChange={e => setPdfUrl(e.target.value)}
-                    placeholder="https://... / docs / signed_pdf.pdf"
-                    className="w-full text-xs px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white font-mono"
+                    ref={fileInputRefPdf}
+                    type="file"
+                    accept=".pdf,.doc,.docx,application/pdf"
+                    className="hidden"
+                    onChange={handlePdfUpload}
                   />
+
+                  {pdfUrl ? (
+                    <div className="flex items-center justify-between p-2.5 rounded-xl border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50/60 dark:bg-emerald-950/20">
+                      <div className="flex items-center gap-2.5 overflow-hidden">
+                        <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 flex items-center justify-center shrink-0">
+                          <FileText className="w-4 h-4" />
+                        </div>
+                        <div className="truncate text-left">
+                          <div className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">
+                            {pdfFileName || pdfUrl.split('/').pop() || 'signed_confirmation.pdf'}
+                          </div>
+                          <a 
+                            href={resolveMediaUrl(pdfUrl)} 
+                            target="_blank" 
+                            rel="noreferrer"
+                            className="text-[11px] text-blue-600 hover:text-blue-700 dark:text-blue-400 inline-flex items-center gap-1 font-medium hover:underline"
+                          >
+                            <ExternalLink className="w-2.5 h-2.5" /> Preview Document
+                          </a>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                        <button
+                          type="button"
+                          onClick={() => fileInputRefPdf.current?.click()}
+                          disabled={uploadingPdf}
+                          className="px-2.5 py-1 text-[11px] font-bold bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 transition cursor-pointer"
+                        >
+                          Change
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setPdfUrl(''); setPdfFileName(''); }}
+                          className="p-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition cursor-pointer"
+                          title="Remove file"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div 
+                      onClick={() => !uploadingPdf && fileInputRefPdf.current?.click()}
+                      className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-indigo-500 dark:hover:border-indigo-400 rounded-xl p-3 text-center cursor-pointer transition-all bg-slate-50/50 hover:bg-indigo-50/30 dark:bg-slate-800/30 dark:hover:bg-indigo-950/20 group"
+                    >
+                      {uploadingPdf ? (
+                        <div className="flex items-center justify-center gap-2 text-xs font-semibold text-indigo-600 dark:text-indigo-400 py-1">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Uploading Document...</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 py-0.5">
+                          <UploadCloud className="w-4 h-4 text-indigo-500 group-hover:scale-110 transition-transform" />
+                          <span>Upload PDF Document (Click to Browse)</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
+                {/* 2. Recording Type */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
                     Recording Type
@@ -264,18 +377,93 @@ export default function ConfirmationsModal({ isOpen, onClose, lead, onUpdated })
                   </select>
                 </div>
 
+                {/* 3. Mandatory Recording / Evidence Media Upload */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                    Mandatory Recording / Evidence URL
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                      Mandatory Audio / Video Evidence
+                    </label>
+                    {recordingUrl && (
+                      <span className="text-[10.5px] font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3" /> Attached
+                      </span>
+                    )}
+                  </div>
+
                   <input 
-                    type="url"
-                    value={recordingUrl}
-                    onChange={e => setRecordingUrl(e.target.value)}
-                    placeholder="https://... / recordings / client_confirmation.mp3"
-                    className="w-full text-xs px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white font-mono"
+                    ref={fileInputRefMedia}
+                    type="file"
+                    accept="audio/*,video/*,.mp3,.wav,.m4a,.aac,.ogg,.mp4,.mov,.webm,.3gp"
+                    className="hidden"
+                    onChange={handleMediaUpload}
                   />
-                  <p className="text-[10px] text-slate-400 mt-1">Section 8 requirement: Client confirmation must link to audio/video proof.</p>
+
+                  {recordingUrl ? (
+                    <div className="p-2.5 rounded-xl border border-indigo-200 dark:border-indigo-800/60 bg-indigo-50/50 dark:bg-indigo-950/20 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2.5 overflow-hidden">
+                          <div className="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 flex items-center justify-center shrink-0">
+                            {recordingType === 'VIDEO' ? <Video className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                          </div>
+                          <div className="truncate text-left">
+                            <div className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">
+                              {mediaFileName || recordingUrl.split('/').pop() || 'client_confirmation_recording'}
+                            </div>
+                            <a 
+                              href={resolveMediaUrl(recordingUrl)} 
+                              target="_blank" 
+                              rel="noreferrer"
+                              className="text-[11px] text-blue-600 hover:text-blue-700 dark:text-blue-400 inline-flex items-center gap-1 font-medium hover:underline"
+                            >
+                              <ExternalLink className="w-2.5 h-2.5" /> Play / Open Evidence
+                            </a>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                          <button
+                            type="button"
+                            onClick={() => fileInputRefMedia.current?.click()}
+                            disabled={uploadingMedia}
+                            className="px-2.5 py-1 text-[11px] font-bold bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 transition cursor-pointer"
+                          >
+                            Change
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setRecordingUrl(''); setMediaFileName(''); }}
+                            className="p-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition cursor-pointer"
+                            title="Remove file"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* In-browser preview for audio recordings */}
+                      {recordingUrl && !recordingUrl.match(/\.(mp4|mov|webm)$/i) && (
+                        <audio controls src={resolveMediaUrl(recordingUrl)} className="w-full h-8 pt-0.5" />
+                      )}
+                    </div>
+                  ) : (
+                    <div 
+                      onClick={() => !uploadingMedia && fileInputRefMedia.current?.click()}
+                      className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-purple-500 dark:hover:border-purple-400 rounded-xl p-3 text-center cursor-pointer transition-all bg-slate-50/50 hover:bg-purple-50/30 dark:bg-slate-800/30 dark:hover:bg-purple-950/20 group"
+                    >
+                      {uploadingMedia ? (
+                        <div className="flex items-center justify-center gap-2 text-xs font-semibold text-purple-600 dark:text-purple-400 py-1">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Uploading Audio/Video Evidence...</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300 group-hover:text-purple-600 dark:group-hover:text-purple-400 py-0.5">
+                          <UploadCloud className="w-4 h-4 text-purple-500 group-hover:scale-110 transition-transform" />
+                          <span>Upload Recording / Media File (Audio / Video)</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <p className="text-[10px] text-slate-400 mt-1">Section 8 requirement: Client confirmation must attach audio/video proof.</p>
                 </div>
 
                 <div>
