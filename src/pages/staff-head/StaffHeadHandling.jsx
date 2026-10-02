@@ -396,7 +396,7 @@ export default function StaffHeadHandling() {
             title="Go to Step 13 Visa Location Confirmation Desk"
           >
             <MapPin className="w-3.5 h-3.5 text-blue-600" />
-            <span>Location Confirmation &rarr;</span>
+            <span>Interested Country &rarr;</span>
           </button>
 
           <button

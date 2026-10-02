@@ -312,11 +312,11 @@ export const apiTransferLeadStage = async (id, transferData) => {
   });
 };
 
-// 10. Assign leads to calling staff (selective)
-export const apiAssignLeads = async (leadIds, callingStaffId) => {
+// 10. Assign leads to calling staff (selective with reassignment support)
+export const apiAssignLeads = async (leadIds, callingStaffId, confirmReassign = false) => {
   return authFetch('/leads/assign-staff', {
     method: 'POST',
-    body: JSON.stringify({ leadIds, callingStaffId })
+    body: JSON.stringify({ leadIds, callingStaffId, confirmReassign })
   });
 };
 

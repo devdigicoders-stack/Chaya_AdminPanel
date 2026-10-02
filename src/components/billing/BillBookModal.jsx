@@ -1,21 +1,47 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   X, Receipt, PlusCircle, CheckCircle2, Clock, 
-  DollarSign, ArrowDownRight, ArrowUpRight} from 'lucide-react';
-import { apiAddBillBookTransaction, apiVerifyBillBookTransaction, apiAddBillBookCharge, getCurrentUser } from '../../utils/api';
+  DollarSign, ArrowDownRight, ArrowUpRight, RefreshCw } from 'lucide-react';
+import { apiAddBillBookTransaction, apiVerifyBillBookTransaction, apiAddBillBookCharge, apiGetLeadById, getCurrentUser } from '../../utils/api';
 import { showSuccessAlert, showErrorAlert } from '../../utils/alerts';
 
 export default function BillBookModal({ isOpen, onClose, lead, onUpdated }) {
   if (!isOpen || !lead) return null;
 
+  const [localLead, setLocalLead] = useState(lead);
+  const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    setLocalLead(lead);
+    if (lead?._id) {
+      refreshLocalLead(lead._id);
+    }
+  }, [lead?._id, isOpen]);
+
+  const refreshLocalLead = async (targetId) => {
+    const id = targetId || localLead?._id || lead?._id;
+    if (!id) return;
+    try {
+      setRefreshing(true);
+      const res = await apiGetLeadById(id);
+      if (res?.data) {
+        setLocalLead(res.data);
+      }
+    } catch (e) {
+      console.error('Failed to refresh bill book lead data:', e);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   const currentUser = getCurrentUser() || {};
   const isAccountsOrAdmin = ['ADMIN', 'SUPER_ADMIN', 'ACCOUNTS', 'Super Administrator', 'Accounts Manager'].includes(currentUser.role) || currentUser.role?.includes('ADMIN') || currentUser.role?.includes('ACCOUNTS');
 
-  const billBook = lead.billBook || {
+  const billBook = localLead?.billBook || {
     isLedgerOpen: false,
-    approvedPayable: lead.paymentBooking?.totalServiceFee || 0,
-    totalReceived: lead.paymentBooking?.advanceAmount || 0,
-    balanceDue: (lead.paymentBooking?.totalServiceFee || 0) - (lead.paymentBooking?.advanceAmount || 0),
+    approvedPayable: localLead?.paymentBooking?.totalServiceFee || 0,
+    totalReceived: localLead?.paymentBooking?.advanceAmount || 0,
+    balanceDue: (localLead?.paymentBooking?.totalServiceFee || 0) - (localLead?.paymentBooking?.advanceAmount || 0),
     approvedRefund: 0,
     refundPaid: 0,
     refundBalance: 0,
@@ -47,10 +73,12 @@ export default function BillBookModal({ isOpen, onClose, lead, onUpdated }) {
     }
     setLoading(true);
     try {
-      await apiAddBillBookTransaction(lead._id, {
+      const res = await apiAddBillBookTransaction(localLead._id, {
         type: txType,
+        head: txType === 'REFUND' ? 'REFUND' : txType,
         amount: parseFloat(txAmount),
-        paymentMethod,
+        paymentMode: paymentMethod,
+        paymentMethod: paymentMethod,
         referenceNo,
         remarks: txRemarks
       });
@@ -59,6 +87,10 @@ export default function BillBookModal({ isOpen, onClose, lead, onUpdated }) {
       setTxAmount('');
       setReferenceNo('');
       setTxRemarks('');
+      if (res?.data) {
+        setLocalLead(prev => ({ ...prev, billBook: res.data }));
+      }
+      await refreshLocalLead();
       if (onUpdated) onUpdated();
     } catch (err) {
       showErrorAlert(err.message || 'Failed to record transaction');
@@ -75,7 +107,8 @@ export default function BillBookModal({ isOpen, onClose, lead, onUpdated }) {
     }
     setLoading(true);
     try {
-      await apiAddBillBookCharge(lead._id, {
+      const res = await apiAddBillBookCharge(localLead._id, {
+        head: 'SERVICE',
         description: chargeDesc,
         amount: parseFloat(chargeAmount)
       });
@@ -83,6 +116,10 @@ export default function BillBookModal({ isOpen, onClose, lead, onUpdated }) {
       setShowAddChargeModal(false);
       setChargeDesc('');
       setChargeAmount('');
+      if (res?.data) {
+        setLocalLead(prev => ({ ...prev, billBook: res.data }));
+      }
+      await refreshLocalLead();
       if (onUpdated) onUpdated();
     } catch (err) {
       showErrorAlert(err.message || 'Failed to add charge');
@@ -95,8 +132,12 @@ export default function BillBookModal({ isOpen, onClose, lead, onUpdated }) {
     if (!confirm(`Verify receipt ${receiptNo}? This confirms money has been cleared by Accounts.`)) return;
     setLoading(true);
     try {
-      await apiVerifyBillBookTransaction(lead._id, receiptNo);
+      const res = await apiVerifyBillBookTransaction(localLead._id, receiptNo);
       showSuccessAlert(`Receipt ${receiptNo} marked as VERIFIED!`);
+      if (res?.data) {
+        setLocalLead(prev => ({ ...prev, billBook: res.data }));
+      }
+      await refreshLocalLead();
       if (onUpdated) onUpdated();
     } catch (err) {
       showErrorAlert(err.message || 'Failed to verify transaction');
@@ -118,18 +159,28 @@ export default function BillBookModal({ isOpen, onClose, lead, onUpdated }) {
             <div>
               <h2 className="text-xl font-bold tracking-tight">Official Bill Book & Ledger</h2>
               <p className="text-xs text-blue-100 opacity-90">
-                Candidate: <span className="font-semibold text-white">{lead.name || lead.candidateName}</span> 
-                {lead.candidateCode && <span className="ml-2 px-2 py-0.5 bg-blue-500/30 rounded text-[10px] font-mono">{lead.candidateCode}</span>}
-                <span className="ml-2 font-mono">({lead.phone})</span>
+                Candidate: <span className="font-semibold text-white">{localLead.name || localLead.candidateName}</span> 
+                {localLead.candidateCode && <span className="ml-2 px-2 py-0.5 bg-blue-500/30 rounded text-[10px] font-mono">{localLead.candidateCode}</span>}
+                <span className="ml-2 font-mono">({localLead.phone})</span>
               </p>
             </div>
           </div>
-          <button 
-            onClick={onClose}
-            className="p-1.5 text-white/80 hover:text-white hover:bg-white/10 rounded-full transition-colors"
-          >
-            <X className="w-6 h-6" />
-          </button>
+          <div className="flex items-center space-x-2">
+            <button 
+              onClick={() => refreshLocalLead()}
+              disabled={refreshing}
+              title="Refresh ledger history"
+              className="p-1.5 text-white/80 hover:text-white hover:bg-white/10 rounded-full transition-colors"
+            >
+              <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
+            </button>
+            <button 
+              onClick={onClose}
+              className="p-1.5 text-white/80 hover:text-white hover:bg-white/10 rounded-full transition-colors"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
         </div>
 
         {/* Ledger Summary Cards */}
@@ -268,17 +319,17 @@ export default function BillBookModal({ isOpen, onClose, lead, onUpdated }) {
                           ₹{(tx.amount || 0).toLocaleString('en-IN')}
                         </td>
                         <td className="py-3 px-4">
-                          <div className="font-semibold text-slate-700 dark:text-slate-300">{tx.paymentMethod}</div>
+                          <div className="font-semibold text-slate-700 dark:text-slate-300">{tx.paymentMode || tx.paymentMethod}</div>
                           {tx.referenceNo && <div className="text-[10px] text-slate-400 font-mono">{tx.referenceNo}</div>}
                         </td>
                         <td className="py-3 px-4">
                           <div className="text-slate-700 dark:text-slate-300">
                             {tx.date ? new Date(tx.date).toLocaleDateString() : 'N/A'}
                           </div>
-                          <div className="text-[10px] text-slate-400">{tx.collectedByName || 'Staff'}</div>
+                          <div className="text-[10px] text-slate-400">{tx.receivedBy || tx.collectedByName || 'Staff'}</div>
                         </td>
                         <td className="py-3 px-4">
-                          {tx.verificationStatus === 'VERIFIED' ? (
+                          {(tx.status === 'VERIFIED' || tx.verificationStatus === 'VERIFIED') ? (
                             <span className="inline-flex items-center space-x-1 text-emerald-600 font-bold text-[11px]">
                               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
                               <span>Verified by Accounts</span>
@@ -291,7 +342,7 @@ export default function BillBookModal({ isOpen, onClose, lead, onUpdated }) {
                           )}
                         </td>
                         <td className="py-3 px-4 text-right">
-                          {tx.verificationStatus !== 'VERIFIED' && isAccountsOrAdmin && (
+                          {tx.status !== 'VERIFIED' && tx.verificationStatus !== 'VERIFIED' && isAccountsOrAdmin && (
                             <button
                               onClick={() => handleVerify(tx.receiptNo)}
                               disabled={loading}
@@ -327,7 +378,7 @@ export default function BillBookModal({ isOpen, onClose, lead, onUpdated }) {
                   {(!billBook.charges || billBook.charges.length === 0) ? (
                     <tr>
                       <td colSpan="4" className="py-8 text-center text-slate-400">
-                        No additional charges applied. Base service fee is ₹{(lead.paymentBooking?.totalServiceFee || 0).toLocaleString('en-IN')}.
+                        No additional charges applied. Base service fee is ₹{(localLead.paymentBooking?.totalServiceFee || 0).toLocaleString('en-IN')}.
                       </td>
                     </tr>
                   ) : (

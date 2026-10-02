@@ -336,7 +336,7 @@ export default function CallingQueue() {
             title="Go to Step 13 Visa Location Confirmation Desk"
           >
             <MapPin className="w-3.5 h-3.5 text-purple-600" />
-            <span>Confirm Visa Location &rarr;</span>
+            <span>Interested Country &rarr;</span>
           </button>
 
           <button

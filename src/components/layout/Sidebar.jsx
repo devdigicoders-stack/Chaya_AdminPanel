@@ -107,7 +107,7 @@ const Sidebar = ({ isOpen = false, onClose = () => {} }) => {
       path: '/calling/queue',
       subItems: [
         { name: 'Calling List & Passport Check', path: '/calling/queue' },
-        { name: 'Confirm Visa Location (4 Edits)', path: '/calling/location-confirm' },
+        { name: 'Interested Country', path: '/calling/location-confirm' },
       ]
     },
     { 

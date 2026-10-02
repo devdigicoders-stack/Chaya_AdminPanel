@@ -4,7 +4,6 @@
  * Import what you need: Skeleton, TableSkeleton, CardSkeleton, DashboardSkeleton, etc.
  */
 
-import React from 'react';
 
 /* ─────────────── INLINE SHIMMER CSS (injected once) ─────────────── */
 if (typeof document !== 'undefined' && !document.getElementById('skeleton-shimmer-style')) {
@@ -29,7 +28,7 @@ if (typeof document !== 'undefined' && !document.getElementById('skeleton-shimme
 export function Skeleton({ className = '', rounded = 'rounded-lg', style = {} }) {
   return (
     <div
-      className={skeleton-shimmer  }
+      className={`skeleton-shimmer ${rounded} ${className}`}
       style={style}
     />
   );
@@ -61,7 +60,7 @@ export function TableRowSkeleton({ cols = 6, rows = 8 }) {
         <tr key={ri} className="border-b border-slate-700/30">
           {Array.from({ length: cols }).map((_, ci) => (
             <td key={ci} className="px-4 py-3">
-              <Skeleton className={h-4 } />
+              <Skeleton className="h-4 w-full" />
             </td>
           ))}
         </tr>

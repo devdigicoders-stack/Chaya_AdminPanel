@@ -42,6 +42,7 @@ export default function LeadAssignment() {
   const [selected, setSelected] = useState([]);
   const [targetStaff, setTargetStaff] = useState('');
   const [detailLead, setDetailLead] = useState(null);
+  const [customBatchCount, setCustomBatchCount] = useState('');
 
   // Search & Filter States
   const [searchQ, setSearchQ] = useState('');
@@ -147,15 +148,75 @@ export default function LeadAssignment() {
     );
   };
 
-  // 2. Selective Manual Assignment to 1 Calling Staff
-  const handleManualAssign = async () => {
+  // Quick Batch Selection Logic (Pair selection: 10, 20, 25, 30, 40 etc.)
+  const handleSelectBatch = (count) => {
+    if (!filteredLeads.length) return;
+    const num = Math.min(count, filteredLeads.length);
+    const topIds = filteredLeads.slice(0, num).map(l => l._id);
+    setSelected(topIds);
+  };
+
+  const handleCustomBatchSelect = (e) => {
+    if (e) e.preventDefault();
+    const count = parseInt(customBatchCount, 10);
+    if (isNaN(count) || count <= 0) return;
+    handleSelectBatch(count);
+  };
+
+  // 2. Selective Manual Assignment to 1 Calling Staff (with Already-Assigned Alert & Reassignment System)
+  const handleManualAssign = async (forceConfirm = false) => {
     if (!selected.length || !targetStaff) return;
     const staff = staffList.find(s => s.id === targetStaff);
     if (!staff) return;
 
+    // Check selected lead objects
+    const selectedObjs = unassignedLeads.filter(l => selected.includes(l._id));
+
+    // Case A: Leads already assigned to THIS EXACT staff member
+    const alreadySameStaff = selectedObjs.filter(l => {
+      const currentStaffId = l.assignedCallingStaff?._id || l.assignedCallingStaff;
+      return currentStaffId && currentStaffId.toString() === targetStaff.toString();
+    });
+
+    if (alreadySameStaff.length > 0 && alreadySameStaff.length === selected.length) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Already Assigned!',
+        html: `All selected <b>${selected.length} lead(s)</b> are already assigned to <b>${staff.name}</b>.<br><span class="text-xs text-gray-500">Duplicate assignment to the same officer is prevented.</span>`,
+        confirmButtonColor: '#2563EB'
+      });
+      return;
+    }
+
+    // Case B: Leads currently assigned to OTHER staff members
+    const assignedOtherStaff = selectedObjs.filter(l => {
+      const currentStaffId = l.assignedCallingStaff?._id || l.assignedCallingStaff;
+      return currentStaffId && currentStaffId.toString() !== targetStaff.toString();
+    });
+
+    if (assignedOtherStaff.length > 0 && !forceConfirm) {
+      const sampleNames = assignedOtherStaff.slice(0, 3).map(l => `• <b>${l.candidateName || 'Lead'}</b> (with <i>${l.assignedCallingStaff?.name || 'Other Officer'}</i>)`).join('<br>');
+      const confirmResult = await Swal.fire({
+        icon: 'warning',
+        title: 'Confirm Lead Reassignment',
+        html: `<div class="text-left text-sm space-y-2">
+          <p><b>${assignedOtherStaff.length} of ${selected.length} lead(s)</b> are already assigned to another calling officer:</p>
+          <div class="bg-amber-50 p-2.5 rounded-lg border border-amber-200 text-xs text-amber-900">${sampleNames}${assignedOtherStaff.length > 3 ? `<br><i>...and ${assignedOtherStaff.length - 3} more</i>` : ''}</div>
+          <p class="pt-1">Do you want to reassign them to <b>${staff.name}</b>?</p>
+        </div>`,
+        showCancelButton: true,
+        confirmButtonColor: '#2563EB',
+        cancelButtonColor: '#6B7280',
+        confirmButtonText: 'Yes, Reassign Leads',
+        cancelButtonText: 'Cancel'
+      });
+
+      if (!confirmResult.isConfirmed) return;
+    }
+
     setActionLoading(true);
     try {
-      await apiAssignLeads(selected, targetStaff);
+      await apiAssignLeads(selected, targetStaff, true);
 
       Swal.fire({
         icon: 'success',
@@ -424,52 +485,131 @@ export default function LeadAssignment() {
         )}
       </div>
 
-      {/* 4. Selective Manual Assignment Action Bar */}
-      <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs p-4 sm:p-5 mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-200">
-            <UserCheck className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-[14px] font-bold text-gray-900">
-              Manual Selective Lead Assignment
+      {/* 4. Batch Pair Selection & Manual Assignment Action Bar */}
+      <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs p-4 sm:p-5 mb-6 space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-200">
+              <UserCheck className="w-5 h-5" />
             </div>
-            <div className="text-[12px] text-gray-500">
-              {selected.length > 0 ? (
-                <span className="text-blue-700 font-bold">{selected.length} candidate(s) selected below</span>
-              ) : (
-                'Select individual checkboxes in the pool below to assign to a specific officer'
-              )}
+            <div>
+              <div className="text-[14px] font-bold text-gray-900 flex items-center gap-2">
+                <span>Batch Pair Selection & Lead Assignment</span>
+                {selected.length > 0 && (
+                  <span className="px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-blue-600 text-white font-mono shadow-2xs">
+                    {selected.length} Selected
+                  </span>
+                )}
+              </div>
+              <div className="text-[12px] text-gray-500">
+                Pick a batch size (10, 20, 25, 30, 40...) to auto-select and assign leads instantly to calling staff.
+              </div>
             </div>
           </div>
+
+          {selected.length > 0 && (
+            <button
+              onClick={() => setSelected([])}
+              className="text-xs text-rose-600 hover:text-rose-700 font-bold self-start md:self-auto cursor-pointer"
+            >
+              ✕ Clear Selection ({selected.length})
+            </button>
+          )}
         </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap">
-          <select
-            value={targetStaff}
-            onChange={(e) => setTargetStaff(e.target.value)}
-            disabled={staffList.length === 0}
-            className="border border-gray-200 rounded-xl px-3.5 py-2 text-[12.5px] font-medium focus:outline-none focus:border-blue-500 bg-white min-w-[240px] cursor-pointer disabled:bg-gray-100 disabled:text-gray-400"
-          >
-            <option value="">{staffList.length === 0 ? 'No Calling Officers Available' : 'Select Target Calling Officer…'}</option>
-            {staffList.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name} ({s.assigned} leads active)
-              </option>
+        {/* Quick Batch Presets & Custom Qty */}
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-gray-50/80 p-3 rounded-xl border border-gray-100">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[11.5px] font-bold text-gray-600 uppercase tracking-wider flex items-center gap-1">
+              <Zap className="w-3.5 h-3.5 text-amber-500" />
+              Quick Batch:
+            </span>
+            {[10, 20, 25, 30, 40, 50].map((batchSize) => (
+              <button
+                key={batchSize}
+                type="button"
+                onClick={() => handleSelectBatch(batchSize)}
+                disabled={filteredLeads.length === 0}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-2xs ${
+                  selected.length === batchSize
+                    ? 'bg-blue-600 text-white ring-2 ring-blue-400'
+                    : 'bg-white hover:bg-blue-50 text-gray-700 hover:text-blue-700 border border-gray-200'
+                }`}
+                title={`Select first ${batchSize} leads from queue`}
+              >
+                {batchSize} Leads
+              </button>
             ))}
-          </select>
+            <button
+              type="button"
+              onClick={() => handleSelectBatch(filteredLeads.length)}
+              disabled={filteredLeads.length === 0}
+              className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white hover:bg-blue-50 text-gray-700 hover:text-blue-700 border border-gray-200 transition-all cursor-pointer shadow-2xs"
+            >
+              All ({filteredLeads.length})
+            </button>
+          </div>
 
-          <button
-            onClick={handleManualAssign}
-            disabled={!selected.length || !targetStaff || actionLoading || staffList.length === 0}
-            className="px-5 py-2.5 bg-gray-900 hover:bg-gray-800 disabled:opacity-40 text-white rounded-xl text-[12.5px] font-bold transition-colors flex items-center gap-2 cursor-pointer shadow-xs whitespace-nowrap"
-          >
-            {actionLoading ? (
-              <><RefreshCw className="w-4 h-4 animate-spin" /> Assigning...</>
-            ) : (
-              <>Assign {selected.length > 0 ? `${selected.length} ` : ''}Leads <ArrowRight className="w-4 h-4" /></>
-            )}
-          </button>
+          {/* Custom Batch Selector */}
+          <form onSubmit={handleCustomBatchSelect} className="flex items-center gap-2">
+            <span className="text-xs text-gray-500 font-medium">Custom:</span>
+            <input
+              type="number"
+              min="1"
+              max={filteredLeads.length || 1000}
+              placeholder="e.g. 15"
+              value={customBatchCount}
+              onChange={(e) => setCustomBatchCount(e.target.value)}
+              className="w-20 px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs text-gray-800 font-mono font-bold focus:outline-none focus:border-blue-500"
+            />
+            <button
+              type="submit"
+              disabled={!customBatchCount || filteredLeads.length === 0}
+              className="px-3 py-1.5 bg-gray-800 hover:bg-gray-900 disabled:opacity-40 text-white rounded-lg text-xs font-bold transition cursor-pointer shadow-2xs"
+            >
+              Select
+            </button>
+          </form>
+        </div>
+
+        {/* Staff Target Selection & Final Assignment Action */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
+          <div className="text-xs text-gray-600 font-medium flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
+            <span>
+              {selected.length > 0 
+                ? `Ready to assign ${selected.length} candidate(s). Choose target calling officer:`
+                : 'Click any batch preset above (10, 20, 25, 30, 40) to select candidates.'}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
+            <select
+              value={targetStaff}
+              onChange={(e) => setTargetStaff(e.target.value)}
+              disabled={staffList.length === 0}
+              className="border border-gray-200 rounded-xl px-3.5 py-2 text-[12.5px] font-medium focus:outline-none focus:border-blue-500 bg-white min-w-[240px] cursor-pointer disabled:bg-gray-100 disabled:text-gray-400"
+            >
+              <option value="">{staffList.length === 0 ? 'No Calling Officers Available' : 'Select Target Calling Officer…'}</option>
+              {staffList.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name} ({s.assigned} leads active)
+                </option>
+              ))}
+            </select>
+
+            <button
+              onClick={handleManualAssign}
+              disabled={!selected.length || !targetStaff || actionLoading || staffList.length === 0}
+              className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white rounded-xl text-[12.5px] font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs whitespace-nowrap"
+            >
+              {actionLoading ? (
+                <><RefreshCw className="w-4 h-4 animate-spin" /> Assigning...</>
+              ) : (
+                <>Assign {selected.length > 0 ? `${selected.length} ` : ''}Leads <ArrowRight className="w-4 h-4" /></>
+              )}
+            </button>
+          </div>
         </div>
       </div>
 

@@ -310,10 +310,10 @@ export default function VisaLocationConfirmation() {
             <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
             <span onClick={() => navigate('/calling/queue')} className="hover:text-blue-600 cursor-pointer">Calling Desk</span>
             <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
-            <span className="text-gray-900 font-medium">Visa Location Confirmation</span>
+            <span className="text-gray-900 font-medium">Interested Country</span>
           </div>
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight">
-            Visa Location Confirmation
+            Interested Country
           </h1>
         </div>
 
