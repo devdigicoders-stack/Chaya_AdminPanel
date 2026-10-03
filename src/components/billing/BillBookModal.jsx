@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { 
   X, Receipt, PlusCircle, CheckCircle2, Clock, 
-  DollarSign, ArrowDownRight, ArrowUpRight, RefreshCw } from 'lucide-react';
+  DollarSign, ArrowDownRight, ArrowUpRight, RefreshCw,
+  Volume2, ExternalLink, ShieldCheck, FileCheck2, AlertTriangle, MessageCircle
+} from 'lucide-react';
 import { apiAddBillBookTransaction, apiVerifyBillBookTransaction, apiAddBillBookCharge, apiGetLeadById, getCurrentUser } from '../../utils/api';
 import { showSuccessAlert, showErrorAlert } from '../../utils/alerts';
 
@@ -32,6 +34,36 @@ export default function BillBookModal({ isOpen, onClose, lead, onUpdated }) {
     } finally {
       setRefreshing(false);
     }
+  };
+
+  const handleShareReportViaWhatsApp = () => {
+    if (!localLead) return;
+    const phone = localLead.phone || localLead.applicationForm?.phone || '';
+    let digits = String(phone).replace(/\D/g, '');
+    if (digits.length === 10) digits = '91' + digits;
+
+    if (!digits) {
+      showErrorAlert('Missing Phone', 'Candidate phone number is not available for WhatsApp');
+      return;
+    }
+
+    const cName = localLead.candidateName || 'Candidate';
+    const passport = localLead.passportNumber || 'N/A';
+    const slip = localLead.medicalDetails?.slipNo || 'GCC-GAMCA';
+    const pdfUrl = localLead.medicalDetails?.reportUrl || '';
+
+    const text = `Dear ${cName},\n\n` +
+      `Greetings from Chhaya International! 🌟\n\n` +
+      `Your GAMCA Medical Examination Report has been issued:\n` +
+      `📋 Medical Verdict: GAMCA FIT / PASSED\n` +
+      `🆔 Passport: ${passport}\n` +
+      `📄 Slip / Token No: ${slip}\n` +
+      (pdfUrl ? `🔗 Medical Report PDF: ${pdfUrl}\n\n` : `\n`) +
+      `Congratulations on clearing your medical test! To confirm your file for visa issuance and departure scheduling, please confirm your advance booking.\n\n` +
+      `Thank you,\nChhaya International`;
+
+    const waUrl = `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
+    window.open(waUrl, '_blank');
   };
 
   const currentUser = getCurrentUser() || {};
@@ -232,6 +264,92 @@ export default function BillBookModal({ isOpen, onClose, lead, onUpdated }) {
               <div className="text-[11px] text-rose-500/80 mt-0.5">
                 Paid: ₹{(billBook.refundPaid || 0).toLocaleString('en-IN')}
               </div>
+            </div>
+          </div>
+
+          {/* Medical Report & Advance Confirmation Verification Strip */}
+          <div className="mt-4 p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 flex flex-wrap items-center justify-between gap-2.5 text-xs">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-purple-600" />
+                <span>Advance Audit:</span>
+              </span>
+
+              {/* Report Sent */}
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold ${
+                localLead?.medicalDetails?.isReportSent || localLead?.medicalDetails?.reportUrl
+                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400'
+                  : 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-400'
+              }`}>
+                {localLead?.medicalDetails?.isReportSent || localLead?.medicalDetails?.reportUrl ? (
+                  <>
+                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                    <span>Report PDF Sent</span>
+                  </>
+                ) : (
+                  <>
+                    <AlertTriangle className="w-3 h-3 text-amber-600" />
+                    <span>Report PDF Not Sent</span>
+                  </>
+                )}
+              </span>
+
+              {/* After Advance Confirmation */}
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold ${
+                localLead?.paymentDetails?.afterAdvanceConfirmed
+                  ? 'bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-950/40 dark:text-purple-400'
+                  : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+              }`}>
+                <span>After Advance: {localLead?.paymentDetails?.afterAdvanceConfirmed ? 'Confirmed' : 'Pending'}</span>
+              </span>
+
+              {/* Recording Confirmation */}
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold ${
+                localLead?.paymentDetails?.recordingConfirmed
+                  ? 'bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-950/40 dark:text-purple-400'
+                  : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+              }`}>
+                <span>Recording: {localLead?.paymentDetails?.recordingConfirmed ? 'Confirmed' : 'Pending'}</span>
+              </span>
+            </div>
+
+            {/* Recording Audio Link & Report Link & WhatsApp Share */}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleShareReportViaWhatsApp}
+                className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#25D366] hover:bg-[#1EBE5D] text-white rounded-lg text-[11px] font-bold shadow-2xs transition-all cursor-pointer"
+                title="Share Medical Report PDF and details on candidate's WhatsApp"
+              >
+                <MessageCircle className="w-3.5 h-3.5" />
+                <span>Share WhatsApp</span>
+              </button>
+              {localLead?.medicalDetails?.reportUrl && (
+                <a
+                  href={localLead.medicalDetails.reportUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-blue-600 dark:text-blue-400 rounded-lg text-[11px] font-bold"
+                >
+                  <FileCheck2 className="w-3.5 h-3.5" />
+                  <span>Report PDF</span>
+                  <ExternalLink className="w-2.5 h-2.5" />
+                </a>
+              )}
+              {localLead?.paymentDetails?.recordingUrl ? (
+                <a
+                  href={localLead.paymentDetails.recordingUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/40 border border-purple-200 text-purple-700 dark:text-purple-300 rounded-lg text-[11px] font-bold"
+                >
+                  <Volume2 className="w-3.5 h-3.5" />
+                  <span>Call Recording</span>
+                  <ExternalLink className="w-2.5 h-2.5" />
+                </a>
+              ) : (
+                <span className="text-[11px] text-slate-400 italic">No recording audio</span>
+              )}
             </div>
           </div>
 

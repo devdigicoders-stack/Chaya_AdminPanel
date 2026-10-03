@@ -734,3 +734,12 @@ export const apiMarkRefunded = async (id, payoutData = {}) => {
   });
 };
 
+// 46. Medical Report PDF & Advance Payment Workflow
+export const apiSendMedicalReportPdf = async (id, payload = {}) => {
+  return authFetch(`/leads/${id}/medical-report-send`, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+};
+
+

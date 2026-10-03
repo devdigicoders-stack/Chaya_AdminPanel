@@ -42,6 +42,12 @@ export default function RefundCalendarDiary({ onOpenPayoutModal, onUpdated }) {
         if (selectedDay) {
           const updated = res.days.find(d => d.dateKey === selectedDay.dateKey);
           if (updated) setSelectedDay(updated);
+        } else if (res?.days?.length > 0) {
+          // Default auto-select: Today's date, or first day with scheduled candidates, or day 1
+          const todayKey = formatDateKey(new Date());
+          const todayMatch = res.days.find(d => d.dateKey === todayKey);
+          const firstScheduled = res.days.find(d => (d.candidatesCount || 0) > 0);
+          setSelectedDay(todayMatch || firstScheduled || res.days[0]);
         }
       }
     } catch (err) {

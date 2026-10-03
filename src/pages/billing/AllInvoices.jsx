@@ -3,11 +3,11 @@ import {
   ChevronRight, Plus, Download, FileText, Banknote, Hourglass, 
   AlertCircle, CreditCard, ArrowUpRight, CheckCircle2, RotateCcw, 
   Search, RefreshCw, Loader2, Eye, Receipt, Printer, X, Check,
-  UserCheck, ShieldCheck
+  UserCheck, ShieldCheck, AlertTriangle, ExternalLink, Volume2, FileCheck2, MessageCircle
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
-import { apiGetLeads, apiRecordPaymentBooking, apiRecordFinalPayment } from '../../utils/api';
+import { apiGetLeads, apiRecordPaymentBooking, apiRecordFinalPayment, apiSendMedicalReportPdf } from '../../utils/api';
 import BillBookModal from '../../components/billing/BillBookModal';
 
 export default function AllInvoices() {
@@ -34,8 +34,14 @@ export default function AllInvoices() {
     medicalPaid: '',
     paymentMode: 'UPI',
     receiptNo: '',
-    remarks: ''
+    remarks: '',
+    afterAdvanceConfirmed: false,
+    recordingConfirmed: false,
+    recordingUrl: '',
+    reportUrl: ''
   });
+  const [reportSentStatus, setReportSentStatus] = useState(false);
+  const [sendingReport, setSendingReport] = useState(false);
 
   // Fetch leads with billing & accounts data
   const fetchBillingLeads = async () => {
@@ -65,6 +71,66 @@ export default function AllInvoices() {
     fetchBillingLeads();
   }, []);
 
+  // Send Medical Report PDF in modal
+  const handleSendReportInInvoiceModal = async () => {
+    if (!paymentModalLead) return;
+    setSendingReport(true);
+    try {
+      const res = await apiSendMedicalReportPdf(paymentModalLead._id, { reportUrl: paymentForm.reportUrl });
+      if (res?.success) {
+        setReportSentStatus(true);
+        Swal.fire({
+          icon: 'success',
+          title: 'Report Sent!',
+          text: `Medical Report PDF marked as sent for ${paymentModalLead.candidateName}. Advance payment collection unlocked.`,
+          timer: 2000
+        });
+        fetchBillingLeads();
+      } else {
+        Swal.fire({ icon: 'error', title: 'Failed', text: res?.message || 'Could not send medical report' });
+      }
+    } catch (err) {
+      Swal.fire({ icon: 'error', title: 'Error', text: err.message || 'Error sending report' });
+    } finally {
+      setSendingReport(false);
+    }
+  };
+
+  // Share Medical Report PDF & Confirmation on candidate's WhatsApp
+  const handleShareReportViaWhatsApp = async () => {
+    if (!paymentModalLead) return;
+    const phone = paymentModalLead.phone || paymentModalLead.applicationForm?.phone || '';
+    let digits = String(phone).replace(/\D/g, '');
+    if (digits.length === 10) digits = '91' + digits;
+
+    if (!digits) {
+      Swal.fire({ icon: 'warning', title: 'Phone Missing', text: 'Candidate phone number is not available for WhatsApp.' });
+      return;
+    }
+
+    const cName = paymentModalLead.candidateName || 'Candidate';
+    const passport = paymentModalLead.passportNumber || 'N/A';
+    const slip = paymentModalLead.medicalDetails?.slipNo || 'GCC-GAMCA';
+    const pdfUrl = (paymentForm.reportUrl || '').trim() || paymentModalLead.medicalDetails?.reportUrl || '';
+
+    const text = `Dear ${cName},\n\n` +
+      `Greetings from Chhaya International! 🌟\n\n` +
+      `Your GAMCA Medical Examination Report has been issued:\n` +
+      `📋 Medical Verdict: GAMCA FIT / PASSED\n` +
+      `🆔 Passport: ${passport}\n` +
+      `📄 Slip / Token No: ${slip}\n` +
+      (pdfUrl ? `🔗 Medical Report PDF: ${pdfUrl}\n\n` : `\n`) +
+      `Congratulations on clearing your medical test! To confirm your file for visa issuance and departure scheduling, please confirm your advance booking.\n\n` +
+      `Thank you,\nChhaya International`;
+
+    const waUrl = `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
+    window.open(waUrl, '_blank');
+
+    if (!reportSentStatus) {
+      await handleSendReportInInvoiceModal();
+    }
+  };
+
   // Save Payment
   const handleSavePayment = async (e) => {
     e.preventDefault();
@@ -78,6 +144,34 @@ export default function AllInvoices() {
         const sFee = Number(paymentModalLead.paymentDetails?.serviceFee) || 9500;
         const mFee = Number(paymentModalLead.paymentDetails?.medicalFee) || 2500;
 
+        // Strict validation rules for advance (service fee)
+        if (sPaid > 0) {
+          if (!reportSentStatus) {
+            Swal.fire({
+              icon: 'warning',
+              title: 'Medical Report Required',
+              text: 'Medical Report PDF must be sent/uploaded to candidate before advance payment can be collected!'
+            });
+            return;
+          }
+          if (!paymentForm.afterAdvanceConfirmed || !paymentForm.recordingConfirmed) {
+            Swal.fire({
+              icon: 'warning',
+              title: 'Confirmations Mandatory',
+              text: "Both 'After Advance Confirmation' and 'Recording Confirmation' checkboxes must be ticked to save advance payment."
+            });
+            return;
+          }
+          if (!paymentForm.recordingUrl || !paymentForm.recordingUrl.trim()) {
+            Swal.fire({
+              icon: 'warning',
+              title: 'Recording URL Required',
+              text: 'Call recording audio file/URL is strictly required to save advance payment.'
+            });
+            return;
+          }
+        }
+
         const res = await apiRecordPaymentBooking(paymentModalLead._id, {
           serviceFee: sFee,
           servicePaid: sPaid,
@@ -85,7 +179,10 @@ export default function AllInvoices() {
           medicalPaid: mPaid,
           paymentMode: paymentForm.paymentMode,
           receiptNo: paymentForm.receiptNo,
-          remarks: paymentForm.remarks
+          remarks: paymentForm.remarks,
+          afterAdvanceConfirmed: sPaid > 0 ? paymentForm.afterAdvanceConfirmed : undefined,
+          recordingConfirmed: sPaid > 0 ? paymentForm.recordingConfirmed : undefined,
+          recordingUrl: sPaid > 0 ? paymentForm.recordingUrl.trim() : undefined
         });
 
         if (res?.success) {
@@ -536,8 +633,13 @@ export default function AllInvoices() {
                                   medicalPaid: p.medicalPaid || (balance > sFee ? mFee : 0),
                                   paymentMode: p.paymentMode || 'UPI',
                                   receiptNo: `RCP-${Math.floor(10000 + Math.random() * 90000)}`,
-                                  remarks: 'Payment collected via Billing Registry.'
+                                  remarks: 'Payment collected via Billing Registry.',
+                                  afterAdvanceConfirmed: Boolean(p.afterAdvanceConfirmed),
+                                  recordingConfirmed: Boolean(p.recordingConfirmed),
+                                  recordingUrl: p.recordingUrl || '',
+                                  reportUrl: lead.medicalDetails?.reportUrl || ''
                                 });
+                                setReportSentStatus(Boolean(lead.medicalDetails?.isReportSent || lead.medicalDetails?.reportUrl));
                               }}
                               className="h-7 px-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer active:scale-[0.98] shadow-xs"
                               title="Record Payment for candidate"
@@ -715,34 +817,196 @@ export default function AllInvoices() {
               </div>
 
               {paymentForm.paymentType === 'ADVANCE' ? (
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                      Service Fee Paid (₹) *
-                    </label>
-                    <input
-                      type="number"
-                      required
-                      placeholder="e.g. 5000"
-                      value={paymentForm.servicePaid}
-                      onChange={(e) => setPaymentForm({ ...paymentForm, servicePaid: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-mono font-bold focus:outline-none focus:border-blue-500"
-                    />
+                <>
+                  {/* Medical Report PDF Delivery Status (Mandatory before advance) */}
+                  <div className={`p-3 rounded-xl border transition-all ${
+                    reportSentStatus 
+                      ? 'border-emerald-200 bg-emerald-50/70 text-emerald-900' 
+                      : 'border-amber-300 bg-amber-50/90 text-amber-900'
+                  }`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-start gap-2">
+                        {reportSentStatus ? (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                        ) : (
+                          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                        )}
+                        <div>
+                          <div className="font-bold text-xs flex items-center gap-1.5">
+                            <span>{reportSentStatus ? 'Medical Report PDF Delivered' : 'Medical Report PDF Required'}</span>
+                            <span className={`text-[9.5px] font-extrabold uppercase px-1.5 py-0.2 rounded ${
+                              reportSentStatus ? 'bg-emerald-200 text-emerald-800' : 'bg-amber-200 text-amber-800'
+                            }`}>
+                              {reportSentStatus ? 'Unlocked' : 'Locked'}
+                            </span>
+                          </div>
+                          <p className="text-[11px] mt-0.5 text-gray-600 leading-snug">
+                            {reportSentStatus 
+                              ? 'Candidate has received the official Medical Report PDF. Advance service fee can be collected.' 
+                              : 'Medical Report PDF must be sent to candidate before service fee advance can be saved.'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {reportSentStatus && paymentForm.reportUrl && (
+                        <a
+                          href={paymentForm.reportUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-2 py-0.5 text-[10.5px] font-bold bg-white border border-emerald-300 text-emerald-700 rounded-md hover:bg-emerald-50 inline-flex items-center gap-1 shrink-0"
+                        >
+                          <span>PDF</span>
+                          <ExternalLink className="w-2.5 h-2.5" />
+                        </a>
+                      )}
+                    </div>
+
+                    {/* Send / Update Action */}
+                    <div className="mt-2 pt-2 border-t border-amber-200/80 flex flex-col sm:flex-row items-center gap-2">
+                      <input
+                        type="url"
+                        placeholder="Report PDF URL or Google Drive link..."
+                        value={paymentForm.reportUrl}
+                        onChange={(e) => setPaymentForm({ ...paymentForm, reportUrl: e.target.value })}
+                        className="w-full sm:flex-1 px-2.5 py-1 bg-white border border-gray-300 rounded-lg text-xs font-mono focus:outline-none focus:border-blue-500"
+                      />
+                      <div className="flex items-center gap-1.5 w-full sm:w-auto shrink-0">
+                        <button
+                          type="button"
+                          onClick={handleShareReportViaWhatsApp}
+                          className="flex-1 sm:flex-none px-2.5 py-1 rounded-lg text-xs font-bold flex items-center justify-center gap-1 bg-[#25D366] hover:bg-[#1EBE5D] text-white shadow-2xs transition-all cursor-pointer"
+                          title="Share report PDF and verdict on candidate's WhatsApp"
+                        >
+                          <MessageCircle className="w-3 h-3" />
+                          <span>Share on WhatsApp</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleSendReportInInvoiceModal}
+                          disabled={sendingReport}
+                          className={`flex-1 sm:flex-none px-2.5 py-1 rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-all cursor-pointer ${
+                            reportSentStatus 
+                              ? 'bg-emerald-600 hover:bg-emerald-700 text-white' 
+                              : 'bg-amber-600 hover:bg-amber-700 text-white shadow-2xs'
+                          }`}
+                        >
+                          {sendingReport ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileCheck2 className="w-3 h-3" />}
+                          <span>{reportSentStatus ? 'Update PDF' : 'Mark Report Sent'}</span>
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                      Medical Fee Paid (₹) *
-                    </label>
-                    <input
-                      type="number"
-                      required
-                      placeholder="e.g. 2500"
-                      value={paymentForm.medicalPaid}
-                      onChange={(e) => setPaymentForm({ ...paymentForm, medicalPaid: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-mono font-bold focus:outline-none focus:border-blue-500"
-                    />
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                        Service Fee Paid (₹) *
+                      </label>
+                      <input
+                        type="number"
+                        required
+                        placeholder="e.g. 5000"
+                        value={paymentForm.servicePaid}
+                        onChange={(e) => setPaymentForm({ ...paymentForm, servicePaid: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-mono font-bold focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                        Medical Fee Paid (₹) *
+                      </label>
+                      <input
+                        type="number"
+                        required
+                        placeholder="e.g. 2500"
+                        value={paymentForm.medicalPaid}
+                        onChange={(e) => setPaymentForm({ ...paymentForm, medicalPaid: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-mono font-bold focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
                   </div>
-                </div>
+
+                  {/* Strict Confirmations when servicePaid > 0 */}
+                  {Number(paymentForm.servicePaid) > 0 && (
+                    <div className="p-3 rounded-xl border border-purple-200 bg-purple-50/50 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-purple-900 text-xs flex items-center gap-1.5">
+                          <ShieldCheck className="w-4 h-4 text-purple-600" />
+                          Advance Verification Protocol (Mandatory)
+                        </span>
+                        <span className="text-[9.5px] font-bold bg-purple-200 text-purple-800 px-1.5 py-0.2 rounded-full">
+                          Required
+                        </span>
+                      </div>
+
+                      {/* Checkbox 1: After Advance Confirmation */}
+                      <label className="flex items-start gap-2 p-2 rounded-lg bg-white border border-purple-100 hover:border-purple-300 transition-all cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={paymentForm.afterAdvanceConfirmed}
+                          onChange={(e) => setPaymentForm({ ...paymentForm, afterAdvanceConfirmed: e.target.checked })}
+                          className="mt-0.5 h-3.5 w-3.5 rounded text-purple-600 border-gray-300 focus:ring-purple-500 cursor-pointer"
+                        />
+                        <div className="text-xs text-gray-700 leading-snug">
+                          <span className="font-bold text-gray-900">After Advance Confirmation *</span>
+                          <p className="text-[10.5px] text-gray-500 mt-0.5">
+                            Candidate has received medical report, agreed to service terms, and confirmed advance payment.
+                          </p>
+                        </div>
+                      </label>
+
+                      {/* Checkbox 2: Recording Confirmation */}
+                      <label className="flex items-start gap-2 p-2 rounded-lg bg-white border border-purple-100 hover:border-purple-300 transition-all cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={paymentForm.recordingConfirmed}
+                          onChange={(e) => setPaymentForm({ ...paymentForm, recordingConfirmed: e.target.checked })}
+                          className="mt-0.5 h-3.5 w-3.5 rounded text-purple-600 border-gray-300 focus:ring-purple-500 cursor-pointer"
+                        />
+                        <div className="text-xs text-gray-700 leading-snug">
+                          <span className="font-bold text-gray-900">Recording Confirmation *</span>
+                          <p className="text-[10.5px] text-gray-500 mt-0.5">
+                            Audio call recording confirming agreement to advance payment terms is completed and archived.
+                          </p>
+                        </div>
+                      </label>
+
+                      {/* Recording URL */}
+                      <div>
+                        <label className="block text-[11px] font-bold text-gray-800 mb-1 flex items-center justify-between">
+                          <span className="flex items-center gap-1">
+                            <Volume2 className="w-3.5 h-3.5 text-purple-600" />
+                            <span>Call Recording Audio URL / Drive Link *</span>
+                          </span>
+                          {paymentForm.recordingUrl?.trim() && (
+                            <a
+                              href={paymentForm.recordingUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[10px] text-purple-600 hover:underline inline-flex items-center gap-0.5"
+                            >
+                              <span>Test Link</span>
+                              <ExternalLink className="w-2.5 h-2.5" />
+                            </a>
+                          )}
+                        </label>
+                        <input
+                          type="url"
+                          required={Number(paymentForm.servicePaid) > 0}
+                          placeholder="https://drive.google.com/... or cloud audio URL"
+                          value={paymentForm.recordingUrl}
+                          onChange={(e) => setPaymentForm({ ...paymentForm, recordingUrl: e.target.value })}
+                          className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-mono focus:outline-none focus:border-purple-500"
+                        />
+                        {!paymentForm.recordingUrl?.trim() && (
+                          <span className="text-[10px] text-red-600 font-semibold mt-0.5 block">
+                            * Recording link is required to book service advance.
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </>
               ) : (
                 <div>
                   <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">

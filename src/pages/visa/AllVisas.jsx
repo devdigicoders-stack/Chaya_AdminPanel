@@ -6,9 +6,9 @@ import {
   Loader2, Check, X, Sliders, History
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import Swal from 'sweetalert2';
 import { apiGetLeads, apiUpdateVisaStatus } from '../../utils/api';
 import LeadHistoryModal from '../../components/leads/LeadHistoryModal';
+import ConfirmationsModal from '../../components/leads/ConfirmationsModal';
 
 export default function AllVisas() {
   const navigate = useNavigate();
@@ -19,6 +19,7 @@ export default function AllVisas() {
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState('');
   const [historyCandidate, setHistoryCandidate] = useState(null);
+  const [confirmationsCandidate, setConfirmationsCandidate] = useState(null);
 
   // Filters & Search
   const [searchTerm, setSearchTerm] = useState('');
@@ -29,6 +30,10 @@ export default function AllVisas() {
   const [updateModal, setUpdateModal] = useState(null);
   const [updateStatus, setUpdateStatus] = useState('APPROVED');
   const [updateDate, setUpdateDate] = useState('');
+  const [updateVisaNumber, setUpdateVisaNumber] = useState('');
+  const [updateAppliedDate, setUpdateAppliedDate] = useState('');
+  const [updateStampedDate, setUpdateStampedDate] = useState('');
+  const [updateExpiryDate, setUpdateExpiryDate] = useState('');
   const [updateRemarks, setUpdateRemarks] = useState('');
 
   // Fetch leads
@@ -67,6 +72,16 @@ export default function AllVisas() {
   const handleOpenUpdate = (lead) => {
     setUpdateModal(lead);
     setUpdateStatus(lead.visaDetails?.status === 'APPROVED' ? 'APPROVED' : 'APPROVED');
+    setUpdateVisaNumber(lead.visaDetails?.visaNumber || lead.visaDetails?.applicationNumber || '');
+    setUpdateAppliedDate(lead.visaDetails?.appliedOn ? new Date(lead.visaDetails.appliedOn).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
+    setUpdateStampedDate(lead.visaDetails?.stampedDate ? new Date(lead.visaDetails.stampedDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
+    if (lead.visaDetails?.expiryDate) {
+      setUpdateExpiryDate(new Date(lead.visaDetails.expiryDate).toISOString().split('T')[0]);
+    } else {
+      const exp = new Date();
+      exp.setFullYear(exp.getFullYear() + 2); // Standard 2-year Gulf visa
+      setUpdateExpiryDate(exp.toISOString().split('T')[0]);
+    }
     if (lead.visaDetails?.expectedDate) {
       setUpdateDate(new Date(lead.visaDetails.expectedDate).toISOString().split('T')[0]);
     } else {
@@ -87,6 +102,11 @@ export default function AllVisas() {
       const res = await apiUpdateVisaStatus(updateModal._id, {
         status: updateStatus,
         expectedDate: updateDate,
+        appliedDate: updateAppliedDate,
+        stampedDate: updateStampedDate,
+        expiryDate: updateExpiryDate,
+        visaNumber: updateVisaNumber,
+        notifyStaffHead: true,
         remarks: updateRemarks.trim() || `Status updated to ${updateStatus}`
       });
 
@@ -96,7 +116,7 @@ export default function AllVisas() {
           title: `Visa ${updateStatus}!`,
           html: `Status for <b>${updateModal.candidateName}</b> updated to <b>${updateStatus}</b>.<br>
                  <span class="text-xs text-gray-500 mt-1 block">
-                   ${updateStatus === 'APPROVED' ? 'Candidate file marked Stamped & ready for Final Viva / Placement.' : updateStatus === 'DELAYED' ? 'File redirected to Pre-Viva Delay Review.' : 'Recorded in audit trail.'}
+                   ${updateStatus === 'APPROVED' ? 'Candidate file marked Stamped, Expiry & Applied dates recorded, and dispatched to Staff Head Directorate.' : updateStatus === 'DELAYED' ? 'File redirected to Pre-Viva Delay Review.' : 'Recorded in audit trail.'}
                  </span>`,
           confirmButtonColor: '#2563EB'
         });
@@ -463,18 +483,33 @@ export default function AllVisas() {
                       {/* 4. App # & Visa Type */}
                       <td className="py-3.5 px-4">
                         <div className="font-mono font-bold text-blue-600">{appNo}</div>
+                        {v.visaNumber && v.visaNumber !== appNo && (
+                          <div className="text-[11px] font-mono font-semibold text-emerald-700">Visa: {v.visaNumber}</div>
+                        )}
                         <div className="text-[11px] text-gray-500 mt-0.5">{v.visaType || 'Work Permit'}</div>
                       </td>
 
-                      {/* 5. Expected Ready Date */}
+                      {/* 5. Expected Ready / Expiry Date */}
                       <td className="py-3.5 px-4">
-                        {expDate ? (
+                        {status === 'APPROVED' && v.expiryDate ? (
+                          <div>
+                            <div className="flex items-center gap-1 font-mono font-semibold text-emerald-800 text-[11px]">
+                              <span className="text-[10px] text-gray-500 font-sans">Exp:</span>
+                              <span>{new Date(v.expiryDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                            </div>
+                            {v.appliedOn && (
+                              <div className="text-[10px] text-gray-400 font-mono mt-0.5">
+                                App: {new Date(v.appliedOn).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
+                              </div>
+                            )}
+                          </div>
+                        ) : expDate ? (
                           <div className="flex items-center gap-1 font-mono font-semibold text-gray-800">
                             <Calendar className="w-3.5 h-3.5 text-gray-400" />
                             <span>{new Date(expDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
                           </div>
                         ) : (
-                          <span className="text-gray-400 italic">Pending</span>
+                          <span className="text-gray-400 italic text-xs">Pending</span>
                         )}
                       </td>
 
@@ -526,6 +561,15 @@ export default function AllVisas() {
                             title="Update Consular Visa Status"
                           >
                             Update Status
+                          </button>
+
+                          <button
+                            onClick={() => setConfirmationsCandidate(lead)}
+                            className="h-8 px-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+                            title="After Visa Confirmation, Signatures & Video Recording (Step 13)"
+                          >
+                            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>After Visa (Video)</span>
                           </button>
 
                           <button
@@ -587,25 +631,94 @@ export default function AllVisas() {
                   onChange={(e) => setUpdateStatus(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs bg-white focus:outline-none focus:border-blue-500 font-semibold"
                 >
-                  <option value="APPROVED">Approved & Stamped (Visa Issued)</option>
+                  <option value="APPROVED">Approved & Stamped (Visa Received)</option>
                   <option value="PROCESSING">Embassy Processing</option>
                   <option value="DELAYED">Delayed (Redirect to Pre-Viva Delay Review)</option>
                   <option value="REJECTED">Rejected by Embassy</option>
                 </select>
               </div>
 
-              {/* Expected / Stamped Date */}
-              <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                  {updateStatus === 'APPROVED' ? 'Visa Stamped Date' : 'Expected Ready Date'}
-                </label>
-                <input
-                  type="date"
-                  value={updateDate}
-                  onChange={(e) => setUpdateDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-mono focus:outline-none focus:border-blue-500"
-                />
-              </div>
+              {/* When Approved & Stamped: Show Visa Number, Applied Date, Stamped Date, and Expiry Date */}
+              {updateStatus === 'APPROVED' ? (
+                <>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                      Stamped Visa Number *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. EV-89201948 or Dossier Visa No"
+                      value={updateVisaNumber}
+                      onChange={(e) => setUpdateVisaNumber(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-mono font-bold text-emerald-800 focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                        Visa Applied Date *
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        value={updateAppliedDate}
+                        onChange={(e) => setUpdateAppliedDate(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-mono focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                        Visa Stamped Date *
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        value={updateStampedDate}
+                        onChange={(e) => setUpdateStampedDate(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-mono focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                      Visa Expiry Date (Validity) *
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      value={updateExpiryDate}
+                      onChange={(e) => setUpdateExpiryDate(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-mono font-bold text-purple-700 focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
+
+                  {/* Staff Head Notice */}
+                  <div className="p-3 bg-indigo-50/80 border border-indigo-200 rounded-xl text-xs text-indigo-900 flex items-start gap-2">
+                    <ShieldCheck className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-bold">Staff Head Directorate Dispatch:</span>
+                      <p className="text-[11px] text-indigo-700 mt-0.5">
+                        Saving will automatically log this dossier into the Staff Head Directorate with Visa No, Applied Date, and Expiry Date for flight clearance.
+                      </p>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                    Expected Ready Date
+                  </label>
+                  <input
+                    type="date"
+                    value={updateDate}
+                    onChange={(e) => setUpdateDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-mono focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+              )}
 
               {/* Remarks */}
               <div>
@@ -651,6 +764,14 @@ export default function AllVisas() {
         isOpen={!!historyCandidate}
         onClose={() => setHistoryCandidate(null)}
         candidate={historyCandidate}
+      />
+
+      {/* 7. After Visa Confirmation, Signatures & Video Recording Modal (Step 13) */}
+      <ConfirmationsModal
+        isOpen={Boolean(confirmationsCandidate)}
+        onClose={() => setConfirmationsCandidate(null)}
+        lead={confirmationsCandidate}
+        onUpdated={fetchAllVisas}
       />
 
     </div>

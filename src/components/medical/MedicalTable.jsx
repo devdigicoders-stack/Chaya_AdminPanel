@@ -3,14 +3,16 @@ import {
   Search, ChevronDown, Calendar as CalendarIcon, CheckCircle2, XCircle, 
   Clock, Eye, Edit3, ArrowRight, MapPin, FileCheck2, Filter, RotateCcw, 
   AlertTriangle, ShieldCheck, CreditCard, Receipt, Sparkles, X, User, Phone,
-  FileText, History, Check, Calendar, Loader2, ArrowLeftRight
+  FileText, History, Check, Calendar, Loader2, ArrowLeftRight, ExternalLink,
+  Volume2, ShieldAlert, MessageCircle
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { 
   apiSubmitMedicalResult, 
   apiRecordPaymentBooking, 
   apiScheduleMedical,
-  apiGetLeadHistory 
+  apiGetLeadHistory,
+  apiSendMedicalReportPdf
 } from '../../utils/api';
 import BillBookModal from '../billing/BillBookModal';
 import ConfirmationsModal from '../leads/ConfirmationsModal';
@@ -50,6 +52,12 @@ export default function MedicalTable({ leads = [], loading = false, onRefresh })
   const [paymentMode, setPaymentMode] = useState('UPI');
   const [paymentRef, setPaymentRef] = useState('');
   const [paymentRemarks, setPaymentRemarks] = useState('');
+  const [afterAdvanceConfirmed, setAfterAdvanceConfirmed] = useState(false);
+  const [recordingConfirmed, setRecordingConfirmed] = useState(false);
+  const [recordingUrl, setRecordingUrl] = useState('');
+  const [reportSentStatus, setReportSentStatus] = useState(false);
+  const [reportUrlInput, setReportUrlInput] = useState('');
+  const [sendingReport, setSendingReport] = useState(false);
 
   // Schedule Center Modal
   const [scheduleModal, setScheduleModal] = useState(null);
@@ -141,6 +149,97 @@ export default function MedicalTable({ leads = [], loading = false, onRefresh })
     setPaymentMode(lead.paymentDetails?.paymentMode || 'UPI');
     setPaymentRef(lead.paymentDetails?.receiptNo || `REC-${Math.floor(10000 + Math.random() * 90000)}`);
     setPaymentRemarks('');
+    setAfterAdvanceConfirmed(Boolean(lead.paymentDetails?.afterAdvanceConfirmed));
+    setRecordingConfirmed(Boolean(lead.paymentDetails?.recordingConfirmed));
+    setRecordingUrl(lead.paymentDetails?.recordingUrl || '');
+    setReportSentStatus(Boolean(lead.medicalDetails?.isReportSent || lead.medicalDetails?.reportUrl));
+    setReportUrlInput(lead.medicalDetails?.reportUrl || '');
+  };
+
+  // Send Medical Report PDF directly from modal
+  const handleSendReportInModal = async () => {
+    if (!paymentModal) return;
+    setSendingReport(true);
+    try {
+      const res = await apiSendMedicalReportPdf(paymentModal._id, { reportUrl: reportUrlInput });
+      if (res?.success) {
+        setReportSentStatus(true);
+        showToast(`Medical Report PDF sent to ${paymentModal.candidateName}! Advance fee collection is now unlocked.`);
+        if (onRefresh) onRefresh();
+      } else {
+        alert(res?.message || 'Failed to send medical report');
+      }
+    } catch (err) {
+      alert(err.message || 'Error sending medical report');
+    } finally {
+      setSendingReport(false);
+    }
+  };
+
+  // Share Report & Verdict directly via WhatsApp
+  const handleShareReportViaWhatsApp = async () => {
+    if (!paymentModal) return;
+    const phone = paymentModal.phone || paymentModal.applicationForm?.phone || '';
+    let digits = String(phone).replace(/\D/g, '');
+    if (digits.length === 10) digits = '91' + digits;
+
+    if (!digits) {
+      alert('Candidate phone number is not available for WhatsApp');
+      return;
+    }
+
+    const cName = paymentModal.candidateName || 'Candidate';
+    const passport = paymentModal.passportNumber || 'N/A';
+    const slip = paymentModal.medicalDetails?.slipNo || reportSlipNo || 'GCC-GAMCA';
+    const pdfUrl = reportUrlInput.trim() || paymentModal.medicalDetails?.reportUrl || '';
+
+    const text = `Dear ${cName},\n\n` +
+      `Greetings from Chhaya International! 🌟\n\n` +
+      `Your GAMCA Medical Examination Report has been issued:\n` +
+      `📋 Medical Verdict: GAMCA FIT / PASSED\n` +
+      `🆔 Passport: ${passport}\n` +
+      `📄 Slip / Token No: ${slip}\n` +
+      (pdfUrl ? `🔗 Medical Report PDF: ${pdfUrl}\n\n` : `\n`) +
+      `Congratulations on clearing your medical test! To confirm your file for visa issuance and departure scheduling, please confirm your advance booking.\n\n` +
+      `Thank you,\nChhaya International`;
+
+    const waUrl = `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
+    window.open(waUrl, '_blank');
+
+    if (!reportSentStatus) {
+      await handleSendReportInModal();
+    }
+  };
+
+  // Direct share for any lead (e.g. from drawer)
+  const handleShareLeadViaWhatsApp = (lead) => {
+    if (!lead) return;
+    const phone = lead.phone || lead.applicationForm?.phone || '';
+    let digits = String(phone).replace(/\D/g, '');
+    if (digits.length === 10) digits = '91' + digits;
+
+    if (!digits) {
+      alert('Candidate phone number is not available for WhatsApp');
+      return;
+    }
+
+    const cName = lead.candidateName || 'Candidate';
+    const passport = lead.passportNumber || 'N/A';
+    const slip = lead.medicalDetails?.slipNo || 'GCC-GAMCA';
+    const pdfUrl = lead.medicalDetails?.reportUrl || '';
+
+    const text = `Dear ${cName},\n\n` +
+      `Greetings from Chhaya International! 🌟\n\n` +
+      `Your GAMCA Medical Examination Report has been issued:\n` +
+      `📋 Medical Verdict: GAMCA FIT / PASSED\n` +
+      `🆔 Passport: ${passport}\n` +
+      `📄 Slip / Token No: ${slip}\n` +
+      (pdfUrl ? `🔗 Medical Report PDF: ${pdfUrl}\n\n` : `\n`) +
+      `Congratulations on clearing your medical test! To confirm your file for visa issuance and departure scheduling, please confirm your advance booking.\n\n` +
+      `Thank you,\nChhaya International`;
+
+    const waUrl = `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
+    window.open(waUrl, '_blank');
   };
 
   // Submit Payment Booking
@@ -166,6 +265,22 @@ export default function MedicalTable({ leads = [], loading = false, onRefresh })
       return;
     }
 
+    // Strict Rule: If service fee (advance) is being collected, report must be sent and confirmations mandatory
+    if (sp > 0) {
+      if (!reportSentStatus) {
+        alert('Medical Report PDF must be sent/uploaded to candidate before advance payment can be collected!');
+        return;
+      }
+      if (!afterAdvanceConfirmed || !recordingConfirmed) {
+        alert("Both 'After Advance Confirmation' and 'Recording Confirmation' checkboxes must be ticked to save advance payment.");
+        return;
+      }
+      if (!recordingUrl || !recordingUrl.trim()) {
+        alert('Call recording audio file/URL is strictly required to save advance payment.');
+        return;
+      }
+    }
+
     setActionLoading(true);
     try {
       const res = await apiRecordPaymentBooking(paymentModal._id, {
@@ -175,7 +290,10 @@ export default function MedicalTable({ leads = [], loading = false, onRefresh })
         medicalPaid: mp,
         paymentMode,
         receiptNo: paymentRef,
-        remarks: paymentRemarks
+        remarks: paymentRemarks,
+        afterAdvanceConfirmed: sp > 0 ? afterAdvanceConfirmed : undefined,
+        recordingConfirmed: sp > 0 ? recordingConfirmed : undefined,
+        recordingUrl: sp > 0 ? recordingUrl.trim() : undefined
       });
 
       if (res?.success) {
@@ -506,6 +624,29 @@ export default function MedicalTable({ leads = [], loading = false, onRefresh })
                         <div className="text-[10px] font-medium text-gray-500 mt-0.5">
                           S: ₹{sPaid} • M: ₹{mPaid}
                         </div>
+                        <div className="flex items-center gap-1 mt-1">
+                          {row.medicalDetails?.isReportSent || row.medicalDetails?.reportUrl ? (
+                            <span className="px-1.5 py-0.2 rounded text-[9.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200" title="Medical Report PDF Sent to candidate">
+                              Report Sent
+                            </span>
+                          ) : (
+                            <span className="px-1.5 py-0.2 rounded text-[9.5px] font-medium bg-amber-50 text-amber-700 border border-amber-200" title="Medical Report PDF not sent yet">
+                              No Report
+                            </span>
+                          )}
+                          {row.paymentDetails?.recordingUrl && (
+                            <a
+                              href={row.paymentDetails.recordingUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-1.5 py-0.2 rounded text-[9.5px] font-bold bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 flex items-center gap-0.5"
+                              title="Advance call recording attached"
+                            >
+                              <span>Rec</span>
+                              <ExternalLink className="w-2.5 h-2.5" />
+                            </a>
+                          )}
+                        </div>
                       </div>
                     </td>
 
@@ -829,6 +970,85 @@ export default function MedicalTable({ leads = [], loading = false, onRefresh })
                 </div>
               </div>
 
+              {/* Medical Report PDF Delivery Card (Required before advance) */}
+              <div className={`p-3.5 rounded-xl border transition-all ${
+                reportSentStatus 
+                  ? 'border-emerald-200 bg-emerald-50/70 text-emerald-900' 
+                  : 'border-amber-300 bg-amber-50/90 text-amber-900'
+              }`}>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-start gap-2.5">
+                    {reportSentStatus ? (
+                      <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                    ) : (
+                      <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                    )}
+                    <div>
+                      <div className="font-bold text-[13px] flex items-center gap-1.5">
+                        <span>{reportSentStatus ? 'Medical Report PDF Delivered' : 'Medical Report PDF Required Before Advance'}</span>
+                        <span className={`text-[10px] font-extrabold uppercase px-1.5 py-0.2 rounded ${
+                          reportSentStatus ? 'bg-emerald-200 text-emerald-800' : 'bg-amber-200 text-amber-800'
+                        }`}>
+                          {reportSentStatus ? 'Advance Unlocked' : 'Advance Locked'}
+                        </span>
+                      </div>
+                      <p className="text-[11.5px] mt-0.5 text-gray-600 leading-relaxed">
+                        {reportSentStatus 
+                          ? 'The candidate has been officially sent the Medical Report PDF. Office service fee (advance) is eligible for collection.' 
+                          : 'Per operating protocol, candidate must receive their official GAMCA medical fitness PDF before advance money can be collected.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {reportSentStatus && reportUrlInput && (
+                    <a
+                      href={reportUrlInput}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-2.5 py-1 text-[11px] font-bold bg-white border border-emerald-300 text-emerald-700 rounded-lg hover:bg-emerald-50 inline-flex items-center gap-1 shrink-0 shadow-2xs"
+                    >
+                      <span>View PDF</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+                </div>
+
+                {/* Send / Update Report Action */}
+                <div className="mt-2.5 pt-2.5 border-t border-amber-200/80 flex flex-col sm:flex-row items-center gap-2">
+                  <input
+                    type="url"
+                    placeholder="Report PDF URL or Google Drive link..."
+                    value={reportUrlInput}
+                    onChange={(e) => setReportUrlInput(e.target.value)}
+                    className="w-full sm:flex-1 px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg text-[12px] font-mono focus:outline-none focus:border-blue-500"
+                  />
+                  <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+                    <button
+                      type="button"
+                      onClick={handleShareReportViaWhatsApp}
+                      className="flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-[12px] font-bold flex items-center justify-center gap-1.5 bg-[#25D366] hover:bg-[#1EBE5D] text-white shadow-xs transition-all cursor-pointer"
+                      title="Share Medical Report PDF and verdict directly to candidate's WhatsApp"
+                    >
+                      <MessageCircle className="w-3.5 h-3.5" />
+                      <span>Share via WhatsApp</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSendReportInModal}
+                      disabled={sendingReport}
+                      className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-[12px] font-bold flex items-center justify-center gap-1.5 shrink-0 transition-all cursor-pointer ${
+                        reportSentStatus 
+                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white' 
+                          : 'bg-amber-600 hover:bg-amber-700 text-white shadow-xs'
+                      }`}
+                    >
+                      {sendingReport ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileCheck2 className="w-3.5 h-3.5" />}
+                      <span>{reportSentStatus ? 'Update PDF Link' : 'Mark Report as Sent'}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               {/* Grid: 2 Separate Fee Tracking Sections */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 
@@ -901,6 +1121,100 @@ export default function MedicalTable({ leads = [], loading = false, onRefresh })
                 </div>
 
               </div>
+
+              {/* Strict Confirmations for Advance Payment (Mandatory if servicePaid > 0) */}
+              {Number(servicePaidInput) > 0 && (
+                <div className="p-3.5 rounded-xl border border-purple-200 bg-purple-50/50 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 font-bold text-purple-900 text-[12.5px]">
+                      <ShieldCheck className="w-4 h-4 text-purple-600" />
+                      <span>Advance Payment Verification Protocol (Mandatory)</span>
+                    </div>
+                    <span className="text-[10px] font-bold bg-purple-200 text-purple-800 px-2 py-0.5 rounded-full">
+                      Backend Enforced
+                    </span>
+                  </div>
+
+                  {/* Checkbox 1: After Advance Confirmation */}
+                  <label className="flex items-start gap-2.5 p-2 rounded-lg bg-white border border-purple-100 hover:border-purple-300 transition-all cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={afterAdvanceConfirmed}
+                      onChange={(e) => setAfterAdvanceConfirmed(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 rounded text-purple-600 border-gray-300 focus:ring-purple-500 cursor-pointer"
+                    />
+                    <div className="text-[12px] text-gray-700 leading-snug">
+                      <span className="font-bold text-gray-900">After Advance Confirmation *</span>
+                      <p className="text-[11px] text-gray-500 mt-0.5">
+                        Candidate has received medical report, confirmed acceptance of terms, and agreed to advance service payment.
+                      </p>
+                    </div>
+                  </label>
+
+                  {/* Checkbox 2: Recording Confirmation */}
+                  <label className="flex items-start gap-2.5 p-2 rounded-lg bg-white border border-purple-100 hover:border-purple-300 transition-all cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={recordingConfirmed}
+                      onChange={(e) => setRecordingConfirmed(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 rounded text-purple-600 border-gray-300 focus:ring-purple-500 cursor-pointer"
+                    />
+                    <div className="text-[12px] text-gray-700 leading-snug">
+                      <span className="font-bold text-gray-900">Recording Confirmation *</span>
+                      <p className="text-[11px] text-gray-500 mt-0.5">
+                        Official call recording confirming payment terms and candidate consent has been recorded and verified.
+                      </p>
+                    </div>
+                  </label>
+
+                  {/* Recording URL / Audio File */}
+                  <div>
+                    <label className="block text-[11.5px] font-bold text-gray-800 mb-1 flex items-center justify-between">
+                      <span className="flex items-center gap-1">
+                        <Volume2 className="w-3.5 h-3.5 text-purple-600" />
+                        <span>Call Recording Audio URL / Drive Link *</span>
+                      </span>
+                      {recordingUrl.trim() && (
+                        <a
+                          href={recordingUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10.5px] text-purple-600 hover:underline inline-flex items-center gap-0.5"
+                        >
+                          <span>Test Link</span>
+                          <ExternalLink className="w-2.5 h-2.5" />
+                        </a>
+                      )}
+                    </label>
+                    <input
+                      type="url"
+                      required={Number(servicePaidInput) > 0}
+                      placeholder="https://drive.google.com/... or cloud audio URL"
+                      value={recordingUrl}
+                      onChange={(e) => setRecordingUrl(e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[12px] font-mono focus:outline-none focus:border-purple-500"
+                    />
+                    {!recordingUrl.trim() && (
+                      <span className="text-[10.5px] text-red-600 font-semibold mt-0.5 block">
+                        * Recording link is strictly required to book service advance.
+                      </span>
+                    )}
+
+                    {/* Quick Access to Confirmations Modal */}
+                    <div className="pt-2 mt-2 border-t border-purple-200/80 flex items-center justify-between">
+                      <span className="text-[11px] text-purple-700 font-medium">Step 6 / Confirmation PDF Dossier:</span>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmationsLead(paymentModal)}
+                        className="px-2.5 py-1 bg-white hover:bg-purple-100 text-purple-700 border border-purple-300 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
+                      >
+                        <FileText className="w-3.5 h-3.5 text-purple-600" />
+                        <span>Open Confirmations & PDF Modal</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Payment Mode & Reference */}
               <div className="grid grid-cols-2 gap-3 pt-1">
@@ -1089,6 +1403,139 @@ export default function MedicalTable({ leads = [], loading = false, onRefresh })
                   <div><span className="text-gray-500">Medical Center:</span> <span className="font-semibold text-gray-900">{drawerLead.medicalDetails?.center || 'Not assigned'}</span></div>
                   <div><span className="text-gray-500">Medical Slip:</span> <span className="font-mono font-semibold text-purple-700">{drawerLead.medicalDetails?.slipNo || 'None'}</span></div>
                 </div>
+              </div>
+
+              {/* Medical Report & Advance Confirmation Audit Card */}
+              <div className="bg-white rounded-xl p-4 border border-purple-200 shadow-2xs space-y-3">
+                <div className="font-bold text-purple-950 text-[13.5px] border-b border-purple-100 pb-1.5 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-purple-600" />
+                    <span>Medical & Advance Verification Audit</span>
+                  </div>
+                  <span className="text-[10px] font-mono font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
+                    FRD Sec 11 & 21
+                  </span>
+                </div>
+
+                {/* Report Sent Status */}
+                <div className="p-2.5 rounded-lg bg-gray-50 border border-gray-200 flex items-center justify-between">
+                  <div>
+                    <span className="text-[11.5px] font-semibold text-gray-700 block">Medical Report PDF:</span>
+                    <span className="text-[11px] text-gray-500">
+                      {drawerLead.medicalDetails?.isReportSent || drawerLead.medicalDetails?.reportUrl
+                        ? `Sent to candidate ${drawerLead.medicalDetails?.reportSentAt ? `on ${new Date(drawerLead.medicalDetails.reportSentAt).toLocaleDateString()}` : ''}`
+                        : 'Not delivered yet (Advance payment locked)'}
+                    </span>
+                  </div>
+                  <div>
+                    {drawerLead.medicalDetails?.isReportSent || drawerLead.medicalDetails?.reportUrl ? (
+                      <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-800 flex items-center gap-1">
+                        <Check className="w-3 h-3 text-emerald-700" />
+                        <span>Delivered</span>
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-800">
+                        Pending
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {drawerLead.medicalDetails?.reportUrl && (
+                  <div className="text-[11.5px] flex items-center justify-between px-1">
+                    <span className="text-gray-500">Report Document:</span>
+                    <a
+                      href={drawerLead.medicalDetails.reportUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline font-mono text-[11px] inline-flex items-center gap-1"
+                    >
+                      <span>Open Report PDF</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                )}
+
+                {/* Quick Share on WhatsApp Button */}
+                <button
+                  type="button"
+                  onClick={() => handleShareLeadViaWhatsApp(drawerLead)}
+                  className="w-full py-2 px-3 bg-[#25D366] hover:bg-[#1EBE5D] text-white rounded-lg font-bold text-[12px] flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer"
+                  title="Open candidate's WhatsApp with medical result and report PDF"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  <span>Share Medical Report on WhatsApp</span>
+                </button>
+
+                {/* Step 6 Medical Confirmation Dossier & PDF Modal Button */}
+                <button
+                  type="button"
+                  onClick={() => setConfirmationsLead(drawerLead)}
+                  className="w-full py-2 px-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg font-bold text-[12px] flex items-center justify-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+                  title="Open Official Medical Confirmation Dossier & 8 Mandatory Confirmations"
+                >
+                  <FileText className="w-4 h-4 text-indigo-600" />
+                  <span>Step 6: Medical Confirmation & Dossier PDF</span>
+                </button>
+
+                {/* Advance Confirmation Badges */}
+                <div className="grid grid-cols-2 gap-2 text-[11.5px]">
+                  <div className="p-2 rounded-lg bg-purple-50/60 border border-purple-100">
+                    <div className="text-gray-500 text-[10.5px]">After Advance Check:</div>
+                    <div className="font-bold mt-0.5 flex items-center gap-1">
+                      {drawerLead.paymentDetails?.afterAdvanceConfirmed ? (
+                        <span className="text-emerald-700 flex items-center gap-0.5">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Confirmed</span>
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">Not Logged</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="p-2 rounded-lg bg-purple-50/60 border border-purple-100">
+                    <div className="text-gray-500 text-[10.5px]">Recording Check:</div>
+                    <div className="font-bold mt-0.5 flex items-center gap-1">
+                      {drawerLead.paymentDetails?.recordingConfirmed ? (
+                        <span className="text-emerald-700 flex items-center gap-0.5">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Confirmed</span>
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">Not Logged</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Call Recording Link */}
+                {drawerLead.paymentDetails?.recordingUrl ? (
+                  <div className="p-2.5 rounded-lg bg-indigo-50 border border-indigo-200 flex items-center justify-between text-[12px]">
+                    <div className="flex items-center gap-2">
+                      <Volume2 className="w-4 h-4 text-indigo-600" />
+                      <div>
+                        <div className="font-bold text-indigo-950">Call Audio Recording</div>
+                        <div className="text-[10.5px] text-indigo-600 font-mono truncate max-w-[200px]">
+                          {drawerLead.paymentDetails.recordingUrl}
+                        </div>
+                      </div>
+                    </div>
+                    <a
+                      href={drawerLead.paymentDetails.recordingUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-2.5 py-1 bg-white border border-indigo-300 text-indigo-700 rounded-lg hover:bg-indigo-50 font-bold text-[11px] inline-flex items-center gap-1 shrink-0 shadow-2xs"
+                    >
+                      <span>Listen / View</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                ) : (
+                  <div className="text-[11px] text-gray-400 italic px-1">
+                    No call recording logged for this candidate.
+                  </div>
+                )}
               </div>
 
               {/* History Trail */}

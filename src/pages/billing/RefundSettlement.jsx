@@ -22,8 +22,15 @@ import { generateRefundPdf } from '../../utils/refundPdfGenerator';
 export default function RefundSettlement() {
   const currentUser = getCurrentUser();
 
-  // View Mode: 'CALENDAR' | 'TABLE'
-  const [viewMode, setViewMode] = useState('CALENDAR');
+  // View Mode: 'CALENDAR' | 'TABLE' (Defaults strictly to CALENDAR)
+  const [viewMode, setViewMode] = useState(() => {
+    return localStorage.getItem('refund_view_mode') || 'CALENDAR';
+  });
+
+  const handleSetViewMode = (mode) => {
+    setViewMode(mode);
+    localStorage.setItem('refund_view_mode', mode);
+  };
 
   // State
   const [leads, setLeads] = useState([]);
@@ -335,7 +342,7 @@ export default function RefundSettlement() {
           {/* View Toggle */}
           <div className="flex items-center bg-slate-200/80 p-1 rounded-xl border border-slate-300/70">
             <button
-              onClick={() => setViewMode('CALENDAR')}
+              onClick={() => handleSetViewMode('CALENDAR')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
                 viewMode === 'CALENDAR'
                   ? 'bg-white text-slate-900 shadow-xs'
@@ -346,7 +353,7 @@ export default function RefundSettlement() {
               <span>Refund Diary & Calendar</span>
             </button>
             <button
-              onClick={() => setViewMode('TABLE')}
+              onClick={() => handleSetViewMode('TABLE')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
                 viewMode === 'TABLE'
                   ? 'bg-white text-slate-900 shadow-xs'

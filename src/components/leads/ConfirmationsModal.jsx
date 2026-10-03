@@ -11,8 +11,8 @@ const CONFIRMATION_TEMPLATES = [
   { docType: 'INTERVIEW_CONFIRMATION', title: '2. Interview Confirmation', desk: 'Interview Desk' },
   { docType: 'MEDICAL_FITNESS_DECLARATION', title: '3. Medical Fitness Declaration', desk: 'Medical Desk' },
   { docType: 'COMPANY_SELECTION_OFFER', title: '4. Company Selection / Offer Acceptance', desk: 'Step 8 Desk' },
-  { docType: 'PRE_VIVA_CLEARANCE', title: '5. Pre-Viva Clearance Confirmation', desk: 'Pre-Viva Desk' },
-  { docType: 'VISA_SUBMISSION_APPROVAL', title: '6. Visa Submission Approval', desk: 'Visa Desk' },
+  { docType: 'PRE_VIVA_CLEARANCE', title: '5. PRI Visa Confirmation (Pre-Visa Clearance)', desk: 'Pre-Visa Desk' },
+  { docType: 'VISA_SUBMISSION_APPROVAL', title: '6. After Visa Confirmation (Video & Signatures)', desk: 'Visa Desk' },
   { docType: 'VIVA_STAGE_CLEARANCE', title: '7. Viva Stage Clearance Confirmation', desk: 'Viva Desk' },
   { docType: 'FLIGHT_AND_JOINING', title: '8. Flight & Joining Confirmation', desk: 'Deployment Desk' },
 ];
@@ -150,7 +150,7 @@ export default function ConfirmationsModal({ isOpen, onClose, lead, onUpdated })
       setSharedChannel('WHATSAPP');
       setPdfUrl('');
       setRecordingUrl('');
-      setRecordingType('CALL_RECORDING');
+      setRecordingType(template.docType === 'VISA_SUBMISSION_APPROVAL' ? 'VIDEO' : 'CALL_RECORDING');
       setRemarks('');
     }
   };

@@ -6,9 +6,9 @@ import {
   RefreshCw, Loader2, AlertCircle, MapPin, Check, Sliders, History
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import Swal from 'sweetalert2';
 import { apiGetLeads, apiEvaluatePreViva } from '../../utils/api';
 import LeadHistoryModal from '../../components/leads/LeadHistoryModal';
+import ConfirmationsModal from '../../components/leads/ConfirmationsModal';
 
 export default function AllPreVivas() {
   const navigate = useNavigate();
@@ -19,6 +19,7 @@ export default function AllPreVivas() {
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState('');
   const [historyCandidate, setHistoryCandidate] = useState(null);
+  const [confirmationsCandidate, setConfirmationsCandidate] = useState(null);
 
   // Filters & Search
   const [searchTerm, setSearchTerm] = useState('');
@@ -523,6 +524,15 @@ export default function AllPreVivas() {
                           </button>
 
                           <button
+                            onClick={() => setConfirmationsCandidate(lead)}
+                            className="h-8 px-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+                            title="PRI Visa Confirmation & Call Audio Recording (Step 12)"
+                          >
+                            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>PRI Consent</span>
+                          </button>
+
+                          <button
                             onClick={() => setHistoryCandidate(lead)}
                             className="h-8 px-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1 cursor-pointer"
                             title="View Full Candidate Audit History"
@@ -682,6 +692,14 @@ export default function AllPreVivas() {
         isOpen={!!historyCandidate}
         onClose={() => setHistoryCandidate(null)}
         candidate={historyCandidate}
+      />
+
+      {/* 7. PRI Visa Confirmation & Call Audio Recording Modal (Step 12) */}
+      <ConfirmationsModal
+        isOpen={Boolean(confirmationsCandidate)}
+        onClose={() => setConfirmationsCandidate(null)}
+        lead={confirmationsCandidate}
+        onUpdated={fetchPreVivaLeads}
       />
 
     </div>

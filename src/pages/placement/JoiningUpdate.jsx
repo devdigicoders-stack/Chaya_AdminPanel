@@ -1,13 +1,13 @@
-import { useState, useEffect, useMemo } from 'react';
 import { 
   ChevronRight, Plane, Calendar, Search, 
   X, CheckCircle2, 
   Check, FileText, Globe, Award, 
   RefreshCw, AlertCircle, Loader2, Edit3, Eye, Printer, Navigation,
-  Ticket} from 'lucide-react';
+  Ticket, Video, ShieldCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import { apiGetLeads, apiUpdatePlacementDeployment } from '../../utils/api';
+import ConfirmationsModal from '../../components/leads/ConfirmationsModal';
 
 const AIRLINES = [
   'Emirates Airlines',
@@ -37,6 +37,8 @@ export default function JoiningUpdate() {
   // Modals
   const [viewLead, setViewLead] = useState(null);
   const [editFlightLead, setEditFlightLead] = useState(null);
+  const [confirmationsModalLead, setConfirmationsModalLead] = useState(null);
+  const [videoAgreementDeclared, setVideoAgreementDeclared] = useState(false);
   const [flightForm, setFlightForm] = useState({
     airline: 'Emirates Airlines',
     flightNumber: 'EK 511',
@@ -92,9 +94,30 @@ export default function JoiningUpdate() {
     e.preventDefault();
     if (!editFlightLead) return;
 
+    // Check if video agreement is done or declared
+    const videoConf = (editFlightLead.confirmations || []).find(c => 
+      (c.docType === 'AFTER_VISA_CONFIRMATION' || c.docType === 'VISA_SUBMISSION_APPROVAL' || c.recordingType === 'VIDEO') &&
+      (c.status === 'CLIENT_CONFIRMED' || (c.recordingUrl && c.recordingUrl.trim().length > 0))
+    );
+    const hasVideo = Boolean(videoConf);
+
+    if (!hasVideo && !videoAgreementDeclared) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Video Agreement Required',
+        html: `Per Step 13 mandatory compliance, <b>Candidate's Video Confirmation</b> is required before flight booking.<br><br>
+               Please tick the declaration checkbox below or upload the candidate's video confirmation.`,
+        confirmButtonColor: '#2563EB'
+      });
+      return;
+    }
+
     setActionLoadingId(editFlightLead._id);
     try {
-      const res = await apiUpdatePlacementDeployment(editFlightLead._id, flightForm);
+      const res = await apiUpdatePlacementDeployment(editFlightLead._id, {
+        ...flightForm,
+        videoAgreementDeclared: hasVideo ? true : videoAgreementDeclared
+      });
       if (res?.success) {
         Swal.fire({
           icon: 'success',
@@ -104,6 +127,7 @@ export default function JoiningUpdate() {
           timer: 2000
         });
         setEditFlightLead(null);
+        setVideoAgreementDeclared(false);
         fetchDeployments();
       }
     } catch (err) {
@@ -495,24 +519,44 @@ export default function JoiningUpdate() {
                         </span>
                       </td>
 
-                      {/* Status */}
+                      {/* Status & Video Badge */}
                       <td className="py-3 px-4 text-center">
-                        {status === 'JOINED_ON_SITE' ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            <Check className="w-3 h-3 text-emerald-600" />
-                            Joined On-Site
-                          </span>
-                        ) : status === 'IN_TRANSIT' ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                            <Navigation className="w-3 h-3 text-amber-600" />
-                            In Transit
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                            <Plane className="w-3 h-3 text-blue-600" />
-                            Flight Booked
-                          </span>
-                        )}
+                        <div>
+                          {status === 'JOINED_ON_SITE' ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              <Check className="w-3 h-3 text-emerald-600" />
+                              Joined On-Site
+                            </span>
+                          ) : status === 'IN_TRANSIT' ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                              <Navigation className="w-3 h-3 text-amber-600" />
+                              In Transit
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                              <Plane className="w-3 h-3 text-blue-600" />
+                              Flight Booked
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Video Agreement Pill */}
+                        <div className="mt-1">
+                          {((lead.confirmations || []).some(c => (c.docType === 'AFTER_VISA_CONFIRMATION' || c.docType === 'VISA_SUBMISSION_APPROVAL' || c.recordingType === 'VIDEO') && (c.status === 'CLIENT_CONFIRMED' || c.recordingUrl)) || dep.videoAgreementVerified) ? (
+                            <span className="inline-flex items-center gap-0.5 text-[9.5px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                              <Video className="w-2.5 h-2.5" />
+                              <span>Video OK</span>
+                            </span>
+                          ) : dep.videoAgreementDeclared ? (
+                            <span className="inline-flex items-center gap-0.5 text-[9.5px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                              <span>Video Declared</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-0.5 text-[9.5px] font-bold text-red-600 bg-red-50 px-1.5 py-0.5 rounded border border-red-200">
+                              <span>Video Pending</span>
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {/* Actions */}
@@ -806,10 +850,88 @@ export default function JoiningUpdate() {
                 </select>
               </div>
 
+              {/* IMPORTANT NOTE & DYNAMIC DECLARATION: VIDEO AGREEMENT (STEP 13 RULE) */}
+              {(() => {
+                const videoConf = (editFlightLead.confirmations || []).find(c => 
+                  (c.docType === 'AFTER_VISA_CONFIRMATION' || c.docType === 'VISA_SUBMISSION_APPROVAL' || c.recordingType === 'VIDEO') &&
+                  (c.status === 'CLIENT_CONFIRMED' || (c.recordingUrl && c.recordingUrl.trim().length > 0))
+                );
+                const hasVideoAgreement = Boolean(videoConf || editFlightLead.placementDetails?.deployment?.videoAgreementVerified);
+
+                return (
+                  <div className={`p-4 rounded-xl border ${hasVideoAgreement ? 'bg-emerald-50/80 border-emerald-200' : 'bg-amber-50/90 border-amber-300'}`}>
+                    <div className="flex items-start gap-2.5">
+                      {hasVideoAgreement ? (
+                        <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                      ) : (
+                        <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                      )}
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-bold text-xs uppercase tracking-wider text-gray-900">
+                            Important Note: Client Video Agreement (Step 13 Compliance)
+                          </h4>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${hasVideoAgreement ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                            {hasVideoAgreement ? 'VIDEO CONFIRMED' : 'VIDEO PENDING'}
+                          </span>
+                        </div>
+
+                        <p className="text-xs text-gray-600 mt-1 leading-relaxed">
+                          {hasVideoAgreement ? (
+                            <>
+                              Candidate's mandatory video confirmation has been recorded and attached to the dossier. 
+                              {videoConf?.recordingUrl && (
+                                <a href={videoConf.recordingUrl} target="_blank" rel="noreferrer" className="text-emerald-700 underline font-semibold ml-1">
+                                  View Video Recording
+                                </a>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              Per Step 13 official protocol, <span className="font-semibold text-gray-800">Client ki Video Confirmation surakshit karega</span>. Candidates must record a video confirming visa receipt & terms before departure.
+                            </>
+                          )}
+                        </p>
+
+                        {!hasVideoAgreement && (
+                          <div className="mt-3 pt-2.5 border-t border-amber-200 flex flex-col gap-2">
+                            <label className="flex items-start gap-2 cursor-pointer select-none">
+                              <input
+                                type="checkbox"
+                                checked={videoAgreementDeclared}
+                                onChange={(e) => setVideoAgreementDeclared(e.target.checked)}
+                                className="mt-0.5 w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-gray-300 cursor-pointer"
+                              />
+                              <span className="text-xs font-semibold text-amber-950">
+                                Declaration: I declare and verify that candidate video agreement and travel undertakings have been taken / will be finalized prior to airport boarding.
+                              </span>
+                            </label>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setConfirmationsModalLead(editFlightLead);
+                              }}
+                              className="self-start text-[11px] font-bold text-blue-700 hover:text-blue-900 underline flex items-center gap-1 mt-1 cursor-pointer"
+                            >
+                              <Video className="w-3.5 h-3.5" />
+                              <span>Open Video Confirmation Form</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
               <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-gray-100">
                 <button
                   type="button"
-                  onClick={() => setEditFlightLead(null)}
+                  onClick={() => {
+                    setEditFlightLead(null);
+                    setVideoAgreementDeclared(false);
+                  }}
                   className="h-9 px-3.5 border border-gray-200 rounded-lg text-xs font-semibold text-gray-600 hover:bg-gray-50 cursor-pointer"
                 >
                   Cancel
@@ -829,6 +951,14 @@ export default function JoiningUpdate() {
           </div>
         </div>
       )}
+
+      {/* 7. Confirmations Modal for Quick Video Agreement Recording */}
+      <ConfirmationsModal
+        isOpen={Boolean(confirmationsModalLead)}
+        onClose={() => setConfirmationsModalLead(null)}
+        lead={confirmationsModalLead}
+        onUpdated={fetchDeployments}
+      />
 
     </div>
   );
