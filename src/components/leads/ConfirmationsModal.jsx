@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { 
-  X, FileText, Mic, Video, UploadCloud, Trash2, Loader2, CheckCircle2, ExternalLink, Check, Download, FileDown, Sparkles, Printer 
+  X, FileText, Mic, Video, UploadCloud, Trash2, Loader2, CheckCircle2, ExternalLink, Check, Download, FileDown, Sparkles, Printer, AlertCircle 
 } from 'lucide-react';
 import { apiSaveConfirmation, apiUploadLeadMedia, resolveMediaUrl, getCurrentUser, apiGetLeadById } from '../../utils/api';
 import { showSuccessAlert, showErrorAlert } from '../../utils/alerts';
@@ -107,6 +107,22 @@ export default function ConfirmationsModal({ isOpen, onClose, lead, onUpdated })
     const currentlyConfirmed = existing?.status === 'CLIENT_CONFIRMED';
     const nextStatus = currentlyConfirmed ? 'GENERATED' : 'CLIENT_CONFIRMED';
 
+    // Strict validation: cannot toggle to confirmed without PDF and recording proof
+    if (nextStatus === 'CLIENT_CONFIRMED') {
+      const existingPdf = (existing?.pdfUrl || '').trim();
+      if (!existingPdf) {
+        showErrorAlert(`"${tmpl.title}" cannot be confirmed: Signed PDF document is missing. Please click Details to upload or auto-generate the document first.`);
+        handleOpenEdit(tmpl);
+        return;
+      }
+      const existingRec = (existing?.recordingUrl || '').trim();
+      if (!existingRec) {
+        showErrorAlert(`"${tmpl.title}" cannot be confirmed: Audio/Video recording evidence is missing. Section 8 requires attached media proof before confirming.`);
+        handleOpenEdit(tmpl);
+        return;
+      }
+    }
+
     setQuickSavingDocType(tmpl.docType);
     try {
       await apiSaveConfirmation(localLead._id, {
@@ -195,10 +211,24 @@ export default function ConfirmationsModal({ isOpen, onClose, lead, onUpdated })
     e.preventDefault();
     if (!selectedDoc) return;
 
-    if (status === 'CLIENT_CONFIRMED' && !recordingUrl) {
-      if (!confirm('Warning: Spec requires an Audio/Video recording link for final client confirmation. Do you want to proceed anyway?')) {
-        return;
-      }
+    // 1. Mandatory Signed PDF check
+    const trimmedPdf = (pdfUrl || '').trim();
+    if (!trimmedPdf) {
+      showErrorAlert('Mandatory Signed PDF document is missing! Please upload a PDF document or click "1-Click Auto-Generate Branded PDF" before saving.');
+      return;
+    }
+
+    // 2. Mandatory Audio/Video Evidence check for CLIENT_CONFIRMED
+    const trimmedRec = (recordingUrl || '').trim();
+    if (status === 'CLIENT_CONFIRMED' && !trimmedRec) {
+      showErrorAlert('Mandatory Audio/Video recording evidence is missing! Per Section 8 rules, a client confirmation must include verified call audio or video consent before marking as Client Confirmed.');
+      return;
+    }
+
+    // 3. Specifically for After Visa Confirmation (Video & Signatures)
+    if (selectedDoc.docType === 'VISA_SUBMISSION_APPROVAL' && status === 'CLIENT_CONFIRMED' && !trimmedRec) {
+      showErrorAlert('Video Statement / Consent recording is mandatory for After-Visa Confirmation.');
+      return;
     }
 
     setLoading(true);
@@ -208,8 +238,8 @@ export default function ConfirmationsModal({ isOpen, onClose, lead, onUpdated })
         title: selectedDoc.title,
         status,
         sharedChannel,
-        pdfUrl,
-        recordingUrl,
+        pdfUrl: trimmedPdf,
+        recordingUrl: trimmedRec,
         recordingType,
         remarks
       });
@@ -450,9 +480,16 @@ export default function ConfirmationsModal({ isOpen, onClose, lead, onUpdated })
                 {/* 1. PDF Document Upload */}
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                      Signed PDF Document
-                    </label>
+                    <div className="flex items-center gap-1.5">
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                        Signed PDF Document <span className="text-rose-500 font-bold">*</span>
+                      </label>
+                      {!pdfUrl && (
+                        <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400 bg-rose-100 dark:bg-rose-950/60 border border-rose-300 dark:border-rose-800 px-1.5 py-0.5 rounded">
+                          Mandatory
+                        </span>
+                      )}
+                    </div>
                     <button
                       type="button"
                       onClick={async () => {
@@ -543,7 +580,7 @@ export default function ConfirmationsModal({ isOpen, onClose, lead, onUpdated })
                   ) : (
                     <div 
                       onClick={() => !uploadingPdf && fileInputRefPdf.current?.click()}
-                      className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-indigo-500 dark:hover:border-indigo-400 rounded-xl p-3 text-center cursor-pointer transition-all bg-slate-50/50 hover:bg-indigo-50/30 dark:bg-slate-800/30 dark:hover:bg-indigo-950/20 group"
+                      className="border-2 border-dashed border-rose-300 hover:border-rose-500 dark:border-rose-700/80 dark:hover:border-rose-500 rounded-xl p-3 text-center cursor-pointer transition-all bg-rose-50/20 hover:bg-rose-50/50 dark:bg-rose-950/10 dark:hover:bg-rose-950/20 group"
                     >
                       {uploadingPdf ? (
                         <div className="flex items-center justify-center gap-2 text-xs font-semibold text-indigo-600 dark:text-indigo-400 py-1">
@@ -551,9 +588,14 @@ export default function ConfirmationsModal({ isOpen, onClose, lead, onUpdated })
                           <span>Uploading Document...</span>
                         </div>
                       ) : (
-                        <div className="flex items-center justify-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 py-0.5">
-                          <UploadCloud className="w-4 h-4 text-indigo-500 group-hover:scale-110 transition-transform" />
-                          <span>Upload PDF Document (Click to Browse)</span>
+                        <div className="flex flex-col items-center justify-center gap-0.5 py-0.5">
+                          <div className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
+                            <UploadCloud className="w-4 h-4 text-indigo-500 group-hover:scale-110 transition-transform" />
+                            <span>Upload PDF Document (Click to Browse)</span>
+                          </div>
+                          <span className="text-[10.5px] text-rose-500 dark:text-rose-400 font-medium">
+                            ⚠️ Document is mandatory before saving
+                          </span>
                         </div>
                       )}
                     </div>
@@ -579,11 +621,18 @@ export default function ConfirmationsModal({ isOpen, onClose, lead, onUpdated })
                 {/* 3. Mandatory Recording / Evidence Media Upload */}
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                      Mandatory Audio / Video Evidence
-                    </label>
+                    <div className="flex items-center gap-1.5">
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                        Mandatory Audio / Video Evidence {(status === 'CLIENT_CONFIRMED' || selectedDoc?.docType === 'VISA_SUBMISSION_APPROVAL') && <span className="text-rose-500 font-bold">*</span>}
+                      </label>
+                      {status === 'CLIENT_CONFIRMED' && !recordingUrl && (
+                        <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400 bg-rose-100 dark:bg-rose-950/60 border border-rose-300 dark:border-rose-800 px-1.5 py-0.5 rounded">
+                          Required for Confirmation
+                        </span>
+                      )}
+                    </div>
                     {recordingUrl && (
-                      <span className="text-[10.5px] font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1">
+                      <span className="text-[10.5px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
                         <CheckCircle2 className="w-3 h-3" /> Attached
                       </span>
                     )}
@@ -647,7 +696,11 @@ export default function ConfirmationsModal({ isOpen, onClose, lead, onUpdated })
                   ) : (
                     <div 
                       onClick={() => !uploadingMedia && fileInputRefMedia.current?.click()}
-                      className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-purple-500 dark:hover:border-purple-400 rounded-xl p-3 text-center cursor-pointer transition-all bg-slate-50/50 hover:bg-purple-50/30 dark:bg-slate-800/30 dark:hover:bg-purple-950/20 group"
+                      className={`border-2 border-dashed rounded-xl p-3 text-center cursor-pointer transition-all group ${
+                        status === 'CLIENT_CONFIRMED' 
+                          ? 'border-rose-300 hover:border-rose-500 dark:border-rose-700/80 dark:hover:border-rose-500 bg-rose-50/20 hover:bg-rose-50/50 dark:bg-rose-950/10 dark:hover:bg-rose-950/20' 
+                          : 'border-slate-300 dark:border-slate-700 hover:border-purple-500 dark:hover:border-purple-400 bg-slate-50/50 hover:bg-purple-50/30 dark:bg-slate-800/30 dark:hover:bg-purple-950/20'
+                      }`}
                     >
                       {uploadingMedia ? (
                         <div className="flex items-center justify-center gap-2 text-xs font-semibold text-purple-600 dark:text-purple-400 py-1">
@@ -655,9 +708,16 @@ export default function ConfirmationsModal({ isOpen, onClose, lead, onUpdated })
                           <span>Uploading Audio/Video Evidence...</span>
                         </div>
                       ) : (
-                        <div className="flex items-center justify-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300 group-hover:text-purple-600 dark:group-hover:text-purple-400 py-0.5">
-                          <UploadCloud className="w-4 h-4 text-purple-500 group-hover:scale-110 transition-transform" />
-                          <span>Upload Recording / Media File (Audio / Video)</span>
+                        <div className="flex flex-col items-center justify-center gap-0.5 py-0.5">
+                          <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300 group-hover:text-purple-600 dark:group-hover:text-purple-400">
+                            <UploadCloud className="w-4 h-4 text-purple-500 group-hover:scale-110 transition-transform" />
+                            <span>Upload Recording / Media File (Audio / Video)</span>
+                          </div>
+                          {status === 'CLIENT_CONFIRMED' && (
+                            <span className="text-[10.5px] text-rose-500 dark:text-rose-400 font-medium">
+                              ⚠️ Proof media required to save as Client Confirmed
+                            </span>
+                          )}
                         </div>
                       )}
                     </div>
@@ -678,18 +738,30 @@ export default function ConfirmationsModal({ isOpen, onClose, lead, onUpdated })
                   />
                 </div>
 
+                {/* Validation Notice Banner */}
+                {(!pdfUrl || (status === 'CLIENT_CONFIRMED' && !recordingUrl)) && (
+                  <div className="p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
+                    <span className="font-medium">
+                      {!pdfUrl 
+                        ? 'Signed PDF Document is mandatory. Please upload or auto-generate PDF before saving.' 
+                        : 'Audio/Video Evidence is mandatory to save as Client Confirmed.'}
+                    </span>
+                  </div>
+                )}
+
                 <div className="flex justify-end space-x-2 pt-2">
                   <button 
                     type="button" 
                     onClick={() => setSelectedDoc(null)}
-                    className="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded-lg"
+                    className="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button 
                     type="submit"
                     disabled={loading}
-                    className="px-4 py-1.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg shadow-sm"
+                    className="px-4 py-1.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg shadow-sm cursor-pointer"
                   >
                     {loading ? 'Saving...' : 'Save Confirmation'}
                   </button>
