@@ -944,9 +944,9 @@ export default function MedicalTable({ leads = [], loading = false, onRefresh })
 
       {/* Payment Booking Modal (FRD Section 11 & 21) */}
       {paymentModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in">
-          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 w-full max-w-lg overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-purple-50/70">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-4 md:p-6 overflow-y-auto animate-in fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 w-full max-w-xl max-h-[90vh] flex flex-col my-auto overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-purple-50/80 shrink-0">
               <div className="flex items-center gap-2">
                 <Receipt className="w-5 h-5 text-purple-600" />
                 <div>
@@ -954,10 +954,17 @@ export default function MedicalTable({ leads = [], loading = false, onRefresh })
                   <div className="text-[10.5px] font-semibold text-purple-700">Separate tracking of Service Fee and Medical Fee</div>
                 </div>
               </div>
-              <button onClick={() => setPaymentModal(null)} className="text-gray-400 hover:text-gray-600 text-xl font-bold cursor-pointer">×</button>
+              <button 
+                type="button"
+                onClick={() => setPaymentModal(null)} 
+                className="w-8 h-8 rounded-lg hover:bg-purple-100 text-gray-400 hover:text-gray-700 flex items-center justify-center text-xl font-bold cursor-pointer transition"
+              >
+                ×
+              </button>
             </div>
 
-            <form onSubmit={handleSavePayment} className="p-6 space-y-4 text-[13px]">
+            <form onSubmit={handleSavePayment} className="flex-1 overflow-y-auto flex flex-col min-h-0">
+              <div className="p-5 sm:p-6 space-y-4 text-[13px] flex-1">
               {/* Candidate Info Header */}
               <div className="bg-gray-50 p-3 rounded-xl flex items-center justify-between">
                 <div>
@@ -1258,19 +1265,21 @@ export default function MedicalTable({ leads = [], loading = false, onRefresh })
                   </span>
                 </div>
               </div>
+            </div>
 
-              <div className="flex items-center justify-end gap-3 pt-2 border-t border-gray-100">
+              {/* Sticky Footer */}
+              <div className="px-6 py-3.5 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-3 shrink-0">
                 <button
                   type="button"
                   onClick={() => setPaymentModal(null)}
-                  className="px-4 py-2 border border-gray-200 rounded-lg text-[13px] text-gray-600 hover:bg-gray-50 cursor-pointer"
+                  className="px-4 py-2 border border-gray-200 rounded-lg text-[13px] text-gray-600 hover:bg-gray-100 cursor-pointer font-medium transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={actionLoading}
-                  className="px-5 py-2 bg-purple-600 text-white rounded-lg text-[13px] font-semibold hover:bg-purple-700 shadow-sm cursor-pointer flex items-center gap-1.5"
+                  className="px-5 py-2 bg-purple-600 text-white rounded-lg text-[13px] font-semibold hover:bg-purple-700 shadow-sm cursor-pointer flex items-center gap-1.5 transition active:scale-95"
                 >
                   {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Receipt className="w-4 h-4" />}
                   <span>Save Payment Details</span>
@@ -1283,81 +1292,83 @@ export default function MedicalTable({ leads = [], loading = false, onRefresh })
 
       {/* Schedule Center Modal */}
       {scheduleModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in">
-          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 w-full max-w-md overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-blue-50/70">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-4 overflow-y-auto animate-in fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 w-full max-w-md max-h-[90vh] flex flex-col my-auto overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-blue-50/70 shrink-0">
               <h3 className="font-bold text-gray-900 text-[15px]">Schedule Approved GAMCA Center</h3>
-              <button onClick={() => setScheduleModal(null)} className="text-gray-400 hover:text-gray-600 text-xl font-bold cursor-pointer">×</button>
+              <button onClick={() => setScheduleModal(null)} className="w-8 h-8 rounded-lg hover:bg-blue-100 text-gray-400 hover:text-gray-700 flex items-center justify-center text-xl font-bold cursor-pointer transition">×</button>
             </div>
 
-            <form onSubmit={handleSaveSchedule} className="p-6 space-y-4 text-[13px]">
-              <div className="bg-gray-50 p-3 rounded-xl">
-                <div className="font-bold text-gray-900">{scheduleModal.candidateName}</div>
-                <div className="text-gray-500 font-mono text-[11.5px] mt-0.5">Passport: {scheduleModal.passportNumber || 'N/A'} • ID: {scheduleModal.leadId}</div>
-              </div>
-
-              <div>
-                <label className="block text-[12px] font-semibold text-gray-700 mb-1">Approved Medical Center *</label>
-                <select
-                  required
-                  value={selectedCenter}
-                  onChange={(e) => setSelectedCenter(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[13px] bg-white focus:outline-none focus:border-blue-500"
-                >
-                  {APPROVED_CENTERS.map(c => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[12px] font-semibold text-gray-700 mb-1">Appointment Date *</label>
-                  <input
-                    type="date"
-                    required
-                    value={selectedDate}
-                    onChange={(e) => setSelectedDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:border-blue-500 font-mono"
-                  />
+            <form onSubmit={handleSaveSchedule} className="flex-1 overflow-y-auto flex flex-col min-h-0">
+              <div className="p-6 space-y-4 text-[13px] flex-1">
+                <div className="bg-gray-50 p-3 rounded-xl">
+                  <div className="font-bold text-gray-900">{scheduleModal.candidateName}</div>
+                  <div className="text-gray-500 font-mono text-[11.5px] mt-0.5">Passport: {scheduleModal.passportNumber || 'N/A'} • ID: {scheduleModal.leadId}</div>
                 </div>
+
                 <div>
-                  <label className="block text-[12px] font-semibold text-gray-700 mb-1">Slip / Token No. *</label>
-                  <input
-                    type="text"
+                  <label className="block text-[12px] font-semibold text-gray-700 mb-1">Approved Medical Center *</label>
+                  <select
                     required
-                    value={scheduleSlip}
-                    onChange={(e) => setScheduleSlip(e.target.value)}
+                    value={selectedCenter}
+                    onChange={(e) => setSelectedCenter(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[13px] bg-white focus:outline-none focus:border-blue-500"
+                  >
+                    {APPROVED_CENTERS.map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[12px] font-semibold text-gray-700 mb-1">Appointment Date *</label>
+                    <input
+                      type="date"
+                      required
+                      value={selectedDate}
+                      onChange={(e) => setSelectedDate(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:border-blue-500 font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[12px] font-semibold text-gray-700 mb-1">Slip / Token No. *</label>
+                    <input
+                      type="text"
+                      required
+                      value={scheduleSlip}
+                      onChange={(e) => setScheduleSlip(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[13px] font-mono focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[12px] font-semibold text-gray-700 mb-1">Medical Fee (₹) *</label>
+                  <input
+                    type="number"
+                    required
+                    value={scheduleFee}
+                    onChange={(e) => setScheduleFee(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[13px] font-mono focus:outline-none focus:border-blue-500"
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="block text-[12px] font-semibold text-gray-700 mb-1">Medical Fee (₹) *</label>
-                <input
-                  type="number"
-                  required
-                  value={scheduleFee}
-                  onChange={(e) => setScheduleFee(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[13px] font-mono focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-100">
+              <div className="px-6 py-3.5 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-3 shrink-0">
                 <button
                   type="button"
                   onClick={() => setScheduleModal(null)}
-                  className="px-4 py-2 border border-gray-200 rounded-lg text-[13px] text-gray-600 hover:bg-gray-50 cursor-pointer"
+                  className="px-4 py-2 border border-gray-200 rounded-lg text-[13px] text-gray-600 hover:bg-gray-100 cursor-pointer font-medium transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={actionLoading}
-                  className="px-5 py-2 bg-blue-600 text-white rounded-lg text-[13px] font-semibold hover:bg-blue-700 shadow-sm cursor-pointer flex items-center gap-1.5"
+                  className="px-5 py-2 bg-blue-600 text-white rounded-lg text-[13px] font-semibold hover:bg-blue-700 shadow-sm cursor-pointer flex items-center gap-1.5 transition active:scale-95"
                 >
-                  {actionLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                   <span>Confirm Schedule</span>
                 </button>
               </div>
