@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { 
-  RotateCcw, Banknote, CheckCircle2, Clock, AlertTriangle, 
-  Search, RefreshCw, Loader2, Download, Printer, Eye, 
-  CreditCard, FileText, Plus, X, ArrowUpRight, ShieldCheck,
-  Building, User, Check, AlertCircle, Copy, CheckCheck, Landmark
+  RotateCcw, Banknote, CheckCircle2, Clock, 
+  Search, RefreshCw, Loader2, Download, 
+  CreditCard, FileText, Plus, X, ShieldCheck,
+  Check, AlertCircle, Copy, CheckCheck, Landmark,
+  CalendarDays
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { 
@@ -12,14 +13,17 @@ import {
   apiCloseLeadFile, 
   apiGetLeads, 
   apiUploadLeadMedia,
-  apiGetLeadById,
   getCurrentUser 
 } from '../../utils/api';
 import BillBookModal from '../../components/billing/BillBookModal';
+import RefundCalendarDiary from '../../components/billing/RefundCalendarDiary';
 import { generateRefundPdf } from '../../utils/refundPdfGenerator';
 
 export default function RefundSettlement() {
   const currentUser = getCurrentUser();
+
+  // View Mode: 'CALENDAR' | 'TABLE'
+  const [viewMode, setViewMode] = useState('CALENDAR');
 
   // State
   const [leads, setLeads] = useState([]);
@@ -327,27 +331,60 @@ export default function RefundSettlement() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* View Toggle */}
+          <div className="flex items-center bg-slate-200/80 p-1 rounded-xl border border-slate-300/70">
+            <button
+              onClick={() => setViewMode('CALENDAR')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                viewMode === 'CALENDAR'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <CalendarDays className="w-3.5 h-3.5 text-rose-600" />
+              <span>Refund Diary & Calendar</span>
+            </button>
+            <button
+              onClick={() => setViewMode('TABLE')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                viewMode === 'TABLE'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <FileText className="w-3.5 h-3.5 text-slate-700" />
+              <span>Cases Table ({leads.length})</span>
+            </button>
+          </div>
+
           <button
             onClick={fetchRefundLeads}
             disabled={loading}
-            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 hover:border-slate-400 transition shadow-sm"
+            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 hover:border-slate-400 transition shadow-sm cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-rose-600' : ''}`} />
-            Refresh
+            <span>Refresh</span>
           </button>
 
           <button
             onClick={openNewCancellationModal}
-            className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-lg shadow-sm transition active:scale-95"
+            className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-lg shadow-sm transition active:scale-95 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
-            Initiate Cancellation / Refund
+            <span>Initiate Cancellation / Refund</span>
           </button>
         </div>
       </div>
 
-      {/* ─── KPI Stats Row ─── */}
+      {/* ─── CONDITIONAL VIEW: Calendar Diary vs Cases Table ─── */}
+      {viewMode === 'CALENDAR' ? (
+        <RefundCalendarDiary
+          onOpenPayoutModal={openPayoutModal}
+          onUpdated={fetchRefundLeads}
+        />
+      ) : (
+        <>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 mb-6">
         {/* Card 1: Total Cases */}
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
@@ -479,19 +516,19 @@ export default function RefundSettlement() {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+          <div className="overflow-x-auto custom-scrollbar">
+            <table className="w-full text-left border-collapse min-w-[1020px]">
               <thead>
-                <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-                  <th className="py-3 px-3.5">Candidate & Case</th>
-                  <th className="py-3 px-3.5">Cancellation Details</th>
-                  <th className="py-3 px-3.5 text-right">Total Recv.</th>
-                  <th className="py-3 px-3.5 text-right">Approved Refund</th>
-                  <th className="py-3 px-3.5 text-right">Disbursed</th>
-                  <th className="py-3 px-3.5 text-right">Balance Due</th>
-                  <th className="py-3 px-3.5">Candidate Bank / Payout</th>
-                  <th className="py-3 px-3.5 text-center">Settlement Status</th>
-                  <th className="py-3 px-3.5 text-right">Accounts Actions</th>
+                <tr className="bg-slate-50/90 border-b border-slate-200 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                  <th className="py-3 px-3.5 w-[20%]">Candidate & Case</th>
+                  <th className="py-3 px-3.5 w-[15%]">Cancellation Details</th>
+                  <th className="py-3 px-3.5 text-right w-[10%]">Total Recv.</th>
+                  <th className="py-3 px-3.5 text-right w-[11%]">Approved Refund</th>
+                  <th className="py-3 px-3.5 text-right w-[9%]">Disbursed</th>
+                  <th className="py-3 px-3.5 text-right w-[10%]">Balance Due</th>
+                  <th className="py-3 px-3.5 w-[15%]">Beneficiary Account</th>
+                  <th className="py-3 px-3.5 text-center w-[11%]">Settlement Status</th>
+                  <th className="py-3 px-3.5 text-right w-[13%]">Accounts Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
@@ -505,21 +542,21 @@ export default function RefundSettlement() {
                   const bank = lead.closureDetails?.bankDetails || {};
 
                   return (
-                    <tr key={lead._id} className="hover:bg-slate-50/70 transition">
+                    <tr key={lead._id} className="hover:bg-slate-50/80 transition-colors">
                       {/* Candidate & Case */}
-                      <td className="py-3.5 px-3.5">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center font-black text-slate-700 text-xs shrink-0">
-                            {lead.candidateName?.[0] || 'C'}
+                      <td className="py-3.5 px-3.5 align-middle">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 border border-slate-300 flex items-center justify-center font-bold text-slate-800 text-xs shrink-0 shadow-2xs">
+                            {lead.candidateName?.[0]?.toUpperCase() || 'C'}
                           </div>
-                          <div>
-                            <span className="font-bold text-slate-900 block">{lead.candidateName}</span>
+                          <div className="min-w-0">
+                            <span className="font-bold text-slate-900 text-xs block truncate leading-tight">{lead.candidateName}</span>
                             <div className="flex items-center gap-1.5 text-[11px] text-slate-500 mt-0.5">
-                              <span>{lead.phone}</span>
+                              <span className="font-medium">{lead.phone}</span>
                               {lead.passportNumber && (
                                 <>
-                                  <span>•</span>
-                                  <span className="font-mono">{lead.passportNumber}</span>
+                                  <span className="text-slate-300">•</span>
+                                  <span className="font-mono text-slate-600">{lead.passportNumber}</span>
                                 </>
                               )}
                             </div>
@@ -531,56 +568,75 @@ export default function RefundSettlement() {
                       </td>
 
                       {/* Cancellation Details */}
-                      <td className="py-3.5 px-3.5">
-                        <div className="max-w-xs">
-                          <span className="text-slate-800 font-medium block truncate">
+                      <td className="py-3.5 px-3.5 align-middle">
+                        <div className="max-w-[190px]">
+                          <span className="text-slate-800 font-semibold text-xs block leading-snug truncate" title={lead.closureDetails?.reason || lead.holdReason || 'Client withdrew / Cancellation'}>
                             {lead.closureDetails?.reason || lead.holdReason || 'Client withdrew / Cancellation'}
                           </span>
-                          <span className="text-[11px] text-slate-400 block mt-0.5">
+                          <span className="text-[10.5px] text-slate-400 font-medium flex items-center gap-1 mt-1">
+                            <Clock className="w-3 h-3 text-slate-400 shrink-0" />
                             {lead.closureDetails?.closedAt ? new Date(lead.closureDetails.closedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Date: N/A'}
                           </span>
+                          {(lead.scheduledRefundDate || lead.closureDetails?.scheduledRefundDate) && (
+                            <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-md bg-indigo-50 border border-indigo-200 text-indigo-700 text-[10px] font-bold">
+                              <CalendarDays className="w-2.5 h-2.5 text-indigo-600" />
+                              Slot: {new Date(lead.scheduledRefundDate || lead.closureDetails.scheduledRefundDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                            </span>
+                          )}
                         </div>
                       </td>
 
                       {/* Total Received */}
-                      <td className="py-3.5 px-3.5 text-right font-mono font-medium text-slate-700">
-                        ₹{totalRecv.toLocaleString('en-IN')}
+                      <td className="py-3.5 px-3.5 text-right align-middle tabular-nums">
+                        <span className="text-xs font-semibold text-slate-700">
+                          ₹{totalRecv.toLocaleString('en-IN')}
+                        </span>
                       </td>
 
                       {/* Approved Refund */}
-                      <td className="py-3.5 px-3.5 text-right font-mono font-bold text-rose-700">
-                        ₹{approved.toLocaleString('en-IN')}
+                      <td className="py-3.5 px-3.5 text-right align-middle tabular-nums">
+                        <span className="inline-block px-2 py-0.5 rounded-md text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200/60 shadow-2xs">
+                          ₹{approved.toLocaleString('en-IN')}
+                        </span>
                       </td>
 
                       {/* Disbursed */}
-                      <td className="py-3.5 px-3.5 text-right font-mono font-bold text-emerald-700">
-                        ₹{paid.toLocaleString('en-IN')}
+                      <td className="py-3.5 px-3.5 text-right align-middle tabular-nums">
+                        <span className={`text-xs font-bold ${paid > 0 ? 'text-emerald-700' : 'text-slate-400'}`}>
+                          ₹{paid.toLocaleString('en-IN')}
+                        </span>
                       </td>
 
                       {/* Balance Due */}
-                      <td className="py-3.5 px-3.5 text-right font-mono">
+                      <td className="py-3.5 px-3.5 text-right align-middle tabular-nums">
                         {balance > 0 ? (
-                          <span className="inline-block px-2 py-0.5 rounded font-black text-amber-900 bg-amber-100 border border-amber-200">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-black text-amber-900 bg-amber-100/90 border border-amber-300 shadow-2xs">
                             ₹{balance.toLocaleString('en-IN')}
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-emerald-700 font-bold">
-                            <Check className="w-3.5 h-3.5" />
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 shadow-2xs">
+                            <Check className="w-3 h-3 text-emerald-600" />
                             ₹0 (NIL)
                           </span>
                         )}
                       </td>
 
-                      {/* Bank Details */}
-                      <td className="py-3.5 px-3.5">
+                      {/* Beneficiary Account */}
+                      <td className="py-3.5 px-3.5 align-middle">
                         {bank.accountNumber || bank.upiId ? (
-                          <div className="text-[11px] space-y-0.5 bg-slate-50 p-2 rounded-lg border border-slate-200">
+                          <div className="text-[11px] space-y-1 bg-slate-50/90 p-2 rounded-lg border border-slate-200 min-w-[150px]">
+                            {bank.bankName && (
+                              <div className="font-semibold text-slate-800 text-[10.5px] truncate flex items-center gap-1">
+                                <Landmark className="w-3 h-3 text-slate-500 shrink-0" />
+                                <span className="truncate">{bank.bankName}</span>
+                              </div>
+                            )}
                             {bank.accountNumber && (
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="text-slate-500 font-mono">A/C: {bank.accountNumber}</span>
+                              <div className="flex items-center justify-between gap-1 text-slate-600 font-mono text-[10.5px]">
+                                <span className="truncate">A/C: {bank.accountNumber}</span>
                                 <button
                                   onClick={() => copyToClipboard(bank.accountNumber, `ac_${lead._id}`)}
-                                  className="text-slate-400 hover:text-slate-700"
+                                  className="text-slate-400 hover:text-slate-700 p-0.5 cursor-pointer shrink-0"
                                   title="Copy Account Number"
                                 >
                                   {copiedField === `ac_${lead._id}` ? <CheckCheck className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
@@ -588,11 +644,11 @@ export default function RefundSettlement() {
                               </div>
                             )}
                             {bank.ifscCode && (
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="text-slate-500 font-mono">IFSC: {bank.ifscCode}</span>
+                              <div className="flex items-center justify-between gap-1 text-slate-500 font-mono text-[10px]">
+                                <span>IFSC: {bank.ifscCode}</span>
                                 <button
                                   onClick={() => copyToClipboard(bank.ifscCode, `ifsc_${lead._id}`)}
-                                  className="text-slate-400 hover:text-slate-700"
+                                  className="text-slate-400 hover:text-slate-700 p-0.5 cursor-pointer shrink-0"
                                   title="Copy IFSC"
                                 >
                                   {copiedField === `ifsc_${lead._id}` ? <CheckCheck className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
@@ -600,11 +656,11 @@ export default function RefundSettlement() {
                               </div>
                             )}
                             {bank.upiId && (
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="text-indigo-600 font-mono">UPI: {bank.upiId}</span>
+                              <div className="flex items-center justify-between gap-1 text-indigo-700 font-mono font-medium text-[10.5px]">
+                                <span className="truncate">UPI: {bank.upiId}</span>
                                 <button
                                   onClick={() => copyToClipboard(bank.upiId, `upi_${lead._id}`)}
-                                  className="text-slate-400 hover:text-slate-700"
+                                  className="text-slate-400 hover:text-slate-700 p-0.5 cursor-pointer shrink-0"
                                   title="Copy UPI ID"
                                 >
                                   {copiedField === `upi_${lead._id}` ? <CheckCheck className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
@@ -614,79 +670,77 @@ export default function RefundSettlement() {
                           </div>
                         ) : (
                           <button
-                            onClick={() => {
-                              setBankEditModalLead(lead);
-                            }}
-                            className="text-[11px] text-amber-700 hover:text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2 py-1 rounded-md flex items-center gap-1"
+                            onClick={() => setBankEditModalLead(lead)}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-amber-800 hover:text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition-colors shadow-2xs cursor-pointer whitespace-nowrap"
+                            title="Add Candidate Bank Account or UPI"
                           >
-                            <CreditCard className="w-3 h-3" />
-                            + Add Bank Details
+                            <CreditCard className="w-3.5 h-3.5 text-amber-600" />
+                            <span>+ Add Bank Details</span>
                           </button>
                         )}
                       </td>
 
                       {/* Settlement Status */}
-                      <td className="py-3.5 px-3.5 text-center">
+                      <td className="py-3.5 px-3.5 text-center align-middle">
                         {isSettled ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                            <CheckCircle2 className="w-3 h-3" />
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 shadow-2xs whitespace-nowrap">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                             FINAL CLOSED
                           </span>
                         ) : lead.closureStatus === 'CLOSED_NO_ADVANCE' ? (
-                          <span className="inline-block px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                          <span className="inline-block px-2.5 py-1 rounded-full text-[10.5px] font-bold bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs whitespace-nowrap">
                             CLOSED (NO ADV)
                           </span>
                         ) : lead.closureStatus === 'FINANCIAL_PENDING' ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
-                            <AlertCircle className="w-3 h-3" />
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10.5px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/80 shadow-2xs whitespace-nowrap">
+                            <AlertCircle className="w-3.5 h-3.5 text-indigo-600" />
                             FINANCIAL PENDING
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
-                            <Clock className="w-3 h-3" />
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10.5px] font-bold bg-amber-50 text-amber-800 border border-amber-200/80 shadow-2xs whitespace-nowrap">
+                            <Clock className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
                             REFUND PENDING
                           </span>
                         )}
                       </td>
 
                       {/* Accounts Actions */}
-                      <td className="py-3.5 px-3.5 text-right">
+                      <td className="py-3.5 px-3.5 text-right align-middle">
                         <div className="flex items-center justify-end gap-1.5">
-                          {/* 1. Disburse Payout Button */}
                           {balance > 0 ? (
                             <button
                               onClick={() => openPayoutModal(lead)}
                               disabled={actionLoadingId === lead._id}
-                              className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-xs active:scale-95"
+                              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-xs hover:shadow-sm active:scale-95 cursor-pointer whitespace-nowrap"
                               title="Disburse Refund Payout"
                             >
                               <Banknote className="w-3.5 h-3.5" />
-                              Pay Refund
+                              <span>Pay Refund</span>
                             </button>
                           ) : (
                             <button
                               onClick={() => openPayoutModal(lead)}
-                              className="px-2 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium transition flex items-center gap-1"
+                              className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition flex items-center gap-1 cursor-pointer whitespace-nowrap"
                               title="Record Adjustment / Reversal"
                             >
-                              <Banknote className="w-3.5 h-3.5" />
-                              Adjust
+                              <Banknote className="w-3.5 h-3.5 text-slate-500" />
+                              <span>Adjust</span>
                             </button>
                           )}
 
-                          {/* 2. Bill Book Modal */}
+                          {/* Bill Book */}
                           <button
                             onClick={() => setSelectedBillBookLead(lead)}
-                            className="p-1.5 text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg transition shadow-xs"
+                            className="p-1.5 text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg transition shadow-2xs cursor-pointer"
                             title="Open Central Bill Book Ledger"
                           >
                             <FileText className="w-3.5 h-3.5" />
                           </button>
 
-                          {/* 3. Official PDF Voucher */}
+                          {/* PDF Voucher */}
                           <button
                             onClick={() => generateRefundPdf(lead, { download: true })}
-                            className="p-1.5 text-rose-700 hover:text-rose-900 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition shadow-xs"
+                            className="p-1.5 text-rose-700 hover:text-rose-900 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition shadow-2xs cursor-pointer"
                             title="Download Official Refund & Settlement Statement PDF"
                           >
                             <Download className="w-3.5 h-3.5" />
@@ -701,6 +755,8 @@ export default function RefundSettlement() {
           </div>
         )}
       </div>
+      </>
+      )}
 
       {/* ─── MODAL 1: Disburse Refund Payout ─── */}
       {payoutModalLead && (

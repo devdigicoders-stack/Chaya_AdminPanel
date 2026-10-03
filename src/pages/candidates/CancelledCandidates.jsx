@@ -6,7 +6,7 @@ import {
   X, Check, AlertTriangle} from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
-import { apiGetLeads, apiTransferLeadStage, apiToggleLeadHold } from '../../utils/api';
+import { apiGetLeads, apiTransferLeadStage, apiToggleLeadHold, apiCancelOrHoldLead } from '../../utils/api';
 import LeadHistoryModal from '../../components/leads/LeadHistoryModal';
 
 export default function CancelledCandidates() {
@@ -189,29 +189,55 @@ export default function CancelledCandidates() {
     }
   };
 
-  // Log Candidate Cancellation to Backend
+  // Log Candidate Cancellation to Backend (Payment Enforced Policy: PDF Sec 14)
   const handleLogCancellation = async (e) => {
     e.preventDefault();
     if (!logForm.candidateId) {
-      Swal.fire({ icon: 'warning', title: 'Candidate Required', text: 'Please select a candidate to cancel.' });
+      Swal.fire({ icon: 'warning', title: 'Candidate Required', text: 'Please select a candidate.' });
       return;
     }
 
     setLoggingSubmitting(true);
     try {
       const remarks = `Cancelled Desk: ${logForm.reason}. ${logForm.customNotes || ''}`.trim();
-      const res = await apiTransferLeadStage(logForm.candidateId, {
-        toStage: 'CANCELLED',
-        remarks
+      const res = await apiCancelOrHoldLead(logForm.candidateId, {
+        reason: remarks
       });
 
       if (res?.success) {
-        Swal.fire({
-          icon: 'success',
-          title: 'Cancellation Recorded',
-          text: 'Candidate status moved to CANCELLED and logged in lifecycle audit trail.',
-          confirmButtonColor: '#2563eb'
-        });
+        if (res.actionTaken === 'CANCELLED') {
+          Swal.fire({
+            icon: 'success',
+            title: 'Candidate Cancelled & Refund Queued',
+            html: `
+              <div style="text-align: left; font-size: 13px; line-height: 1.5;">
+                <p><strong>Candidate:</strong> ${res.candidate?.name || 'Selected Candidate'}</p>
+                <p style="margin-top: 4px;"><strong>Payment Received:</strong> <span style="font-weight: 700; color: #059669;">₹${Number(res.totalPaid || 0).toLocaleString()}</span></p>
+                <div style="margin-top: 10px; padding: 10px; border-radius: 8px; background-color: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46;">
+                  <p style="font-weight: 700; font-size: 12px; text-transform: uppercase;">Status: CANCELLED (Refund Pending)</p>
+                  <p style="font-size: 12px; margin-top: 4px;">Payment was received, so the candidate has been marked CANCELLED and queued for accounts refund settlement.</p>
+                </div>
+              </div>
+            `,
+            confirmButtonColor: '#059669'
+          });
+        } else {
+          Swal.fire({
+            icon: 'warning',
+            title: 'Candidate Placed On HOLD',
+            html: `
+              <div style="text-align: left; font-size: 13px; line-height: 1.5;">
+                <p><strong>Candidate:</strong> ${res.candidate?.name || 'Selected Candidate'}</p>
+                <p style="margin-top: 4px;"><strong>Payment Received:</strong> <span style="font-weight: 700; color: #d97706;">₹0 (Zero Payment)</span></p>
+                <div style="margin-top: 10px; padding: 10px; border-radius: 8px; background-color: #fffbeb; border: 1px solid #fde68a; color: #92400e;">
+                  <p style="font-weight: 700; font-size: 12px; text-transform: uppercase;">Policy Enforced: Placed ON HOLD</p>
+                  <p style="font-size: 12px; margin-top: 4px;">Candidate has ₹0 payment received (No Service Fee / Medical Fee). As per company policy, this candidate cannot be cancelled and is placed ON HOLD.</p>
+                </div>
+              </div>
+            `,
+            confirmButtonColor: '#d97706'
+          });
+        }
         setShowLogModal(false);
         setLogForm({
           candidateId: '',
@@ -261,6 +287,21 @@ export default function CancelledCandidates() {
   };
 
   const activeCandidatesList = allLeads.filter(l => l.currentStage !== 'CANCELLED' && l.currentStage !== 'REJECTED');
+
+  const selectedCandidateForLog = useMemo(() => {
+    return allLeads.find(l => l._id === logForm.candidateId);
+  }, [allLeads, logForm.candidateId]);
+
+  const candidatePaidAmount = useMemo(() => {
+    if (!selectedCandidateForLog) return 0;
+    const c = selectedCandidateForLog;
+    const billBookTotal = c.billBook?.totalReceived || 0;
+    const servPaid = c.paymentDetails?.servicePaid || 0;
+    const medPaid = c.paymentDetails?.medicalPaid || 0;
+    const totPaid = c.paymentDetails?.totalPaid || 0;
+    const advPaid = c.paymentDetails?.advancePaid || 0;
+    return Math.max(billBookTotal, (servPaid + medPaid), totPaid, advPaid);
+  }, [selectedCandidateForLog]);
 
   return (
     <div className="flex flex-col flex-1 pb-16 font-sans">
@@ -610,6 +651,32 @@ export default function CancelledCandidates() {
                 </select>
               </div>
 
+              {selectedCandidateForLog && (
+                <div className={`p-3 rounded-xl border text-xs ${
+                  candidatePaidAmount > 0
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                    : 'bg-amber-50 border-amber-200 text-amber-900'
+                }`}>
+                  <div className="flex items-center justify-between font-bold">
+                    <span>Payment Received:</span>
+                    <span className={candidatePaidAmount > 0 ? 'text-emerald-700 font-extrabold text-sm' : 'text-amber-700 font-extrabold text-sm'}>
+                      {candidatePaidAmount > 0 ? `₹${candidatePaidAmount.toLocaleString()}` : '₹0 (Zero Payment)'}
+                    </span>
+                  </div>
+                  <div className="mt-1 text-[11px] leading-relaxed">
+                    {candidatePaidAmount > 0 ? (
+                      <span className="text-emerald-800">
+                        <b>Policy Match:</b> Since candidate has paid service/medical fee, this file will be marked <b>CANCELLED</b> and queued for refund settlement in accounts.
+                      </span>
+                    ) : (
+                      <span className="text-amber-800">
+                        <b>Policy Match:</b> Candidate has ₹0 payment. Under company policy, files without payment <b>cannot be cancelled</b> and will be placed <b>ON HOLD</b>.
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1 uppercase tracking-wider">
                   Primary Cancellation Reason <span className="text-rose-500">*</span>
@@ -653,7 +720,9 @@ export default function CancelledCandidates() {
                 <button
                   type="submit"
                   disabled={loggingSubmitting}
-                  className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                  className={`px-5 py-2 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer flex items-center gap-1.5 disabled:opacity-50 ${
+                    candidatePaidAmount > 0 ? 'bg-red-600 hover:bg-red-700' : 'bg-amber-600 hover:bg-amber-700'
+                  }`}
                 >
                   {loggingSubmitting ? (
                     <>
@@ -663,7 +732,7 @@ export default function CancelledCandidates() {
                   ) : (
                     <>
                       <Check className="w-3.5 h-3.5" />
-                      <span>Record Cancellation</span>
+                      <span>{candidatePaidAmount > 0 ? 'Cancel Candidate & Queue Refund' : 'Place Candidate On Hold'}</span>
                     </>
                   )}
                 </button>

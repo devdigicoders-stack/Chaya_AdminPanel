@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
-import { apiGetLeads, apiToggleLeadHold } from '../../utils/api';
+import { apiGetLeads, apiToggleLeadHold, apiCancelOrHoldLead } from '../../utils/api';
 import LeadHistoryModal from '../../components/leads/LeadHistoryModal';
 import BillBookModal from '../../components/billing/BillBookModal';
 import ConfirmationsModal from '../../components/leads/ConfirmationsModal';
@@ -97,6 +97,88 @@ export default function AllCandidatesPage() {
       }
     } catch (err) {
       Swal.fire({ icon: 'error', title: 'Action Failed', text: err.message || 'Could not update hold status' });
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  // Cancel or Hold Candidate Enforced Policy (PDF Sec 14)
+  const handleCancelOrHoldPrompt = async (candidate) => {
+    const billBookTotal = candidate.billBook?.totalReceived || 0;
+    const servPaid = candidate.paymentDetails?.servicePaid || 0;
+    const medPaid = candidate.paymentDetails?.medicalPaid || 0;
+    const totPaid = candidate.paymentDetails?.totalPaid || 0;
+    const advPaid = candidate.paymentDetails?.advancePaid || 0;
+    const totalPaid = Math.max(billBookTotal, (servPaid + medPaid), totPaid, advPaid);
+
+    const willCancel = totalPaid > 0;
+
+    const { value: formReason } = await Swal.fire({
+      title: willCancel ? 'Cancel Candidate & Queue Refund?' : 'Place Candidate On Hold?',
+      html: `
+        <div style="text-align: left; font-size: 13px; line-height: 1.5;">
+          <p><strong>Candidate:</strong> ${candidate.candidateName || candidate.name || 'Candidate'} (${candidate.passportNumber || candidate.leadId || 'N/A'})</p>
+          <div style="margin: 12px 0; padding: 10px; border-radius: 8px; ${
+            willCancel 
+              ? 'background-color: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46;' 
+              : 'background-color: #fffbeb; border: 1px solid #fde68a; color: #92400e;'
+          }">
+            <div style="font-weight: 700; font-size: 13px; margin-bottom: 4px;">
+              ${willCancel ? '✓ Payment Received: ₹' + totalPaid.toLocaleString() : '⚠ Zero Payment Received (₹0)'}
+            </div>
+            <div style="font-size: 12px;">
+              ${willCancel 
+                ? 'Because Service/Medical fee was received, candidate will be marked <b>CANCELLED</b> and queued for <b>Refund Settlement</b>.' 
+                : 'As per company policy, candidate with ₹0 payment <b>cannot be cancelled</b>. The candidate will be placed <b>ON HOLD</b>.'}
+            </div>
+          </div>
+          <label style="display: block; font-size: 11px; font-weight: bold; margin-bottom: 4px; text-transform: uppercase; color: #475569;">Cancellation / Hold Reason *</label>
+          <textarea id="swal-cancel-reason" class="swal2-textarea" style="width: 100%; margin: 0; box-sizing: border-box; font-size: 13px; height: 80px;" placeholder="Enter specific reason..."></textarea>
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonText: willCancel ? 'Confirm Cancellation' : 'Confirm Place On Hold',
+      confirmButtonColor: willCancel ? '#dc2626' : '#d97706',
+      cancelButtonText: 'Abort',
+      preConfirm: () => {
+        const reason = document.getElementById('swal-cancel-reason')?.value?.trim();
+        if (!reason) {
+          Swal.showValidationMessage('Please enter a cancellation / hold reason');
+          return false;
+        }
+        return reason;
+      }
+    });
+
+    if (!formReason) return;
+
+    setActionLoadingId(candidate._id);
+    try {
+      const res = await apiCancelOrHoldLead(candidate._id, { reason: formReason });
+      if (res?.success) {
+        if (res.actionTaken === 'CANCELLED') {
+          Swal.fire({
+            icon: 'success',
+            title: 'Candidate Cancelled',
+            text: `${candidate.candidateName || 'Candidate'} has been cancelled. Refund queue status: REFUND_PENDING (₹${Number(res.totalPaid || 0).toLocaleString()}).`,
+            confirmButtonColor: '#059669'
+          });
+        } else {
+          Swal.fire({
+            icon: 'info',
+            title: 'Candidate Placed ON HOLD',
+            text: `${candidate.candidateName || 'Candidate'} was placed on HOLD due to ₹0 payment received policy.`,
+            confirmButtonColor: '#d97706'
+          });
+        }
+        fetchCandidates();
+      }
+    } catch (err) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Action Failed',
+        text: err.message || 'Could not process candidate status.'
+      });
     } finally {
       setActionLoadingId(null);
     }
@@ -571,6 +653,17 @@ export default function AllCandidatesPage() {
                             title="Formal Candidate File Closure & Settlement"
                           >
                             <AlertOctagon className="w-3.5 h-3.5 text-rose-500" />
+                          </button>
+
+                          {/* Cancel / Hold Policy Action */}
+                          <button
+                            onClick={() => handleCancelOrHoldPrompt(candidate)}
+                            disabled={actionLoadingId === candidate._id}
+                            className="h-7 px-2 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                            title="Cancel / Hold Candidate (Payment Enforced Policy)"
+                          >
+                            <Ban className="w-3.5 h-3.5 text-red-600" />
+                            <span>Cancel/Hold</span>
                           </button>
 
                           {/* Dossier Modal */}

@@ -304,7 +304,6 @@ export const apiSubmitInterviewResult = async (id, resultData) => {
   });
 };
 
-// 9. Transfer lead to next stage with checklist
 export const apiTransferLeadStage = async (id, transferData) => {
   return authFetch(`/leads/${id}/transfer`, {
     method: 'PUT',
@@ -712,6 +711,26 @@ export const apiCancelOrHoldLead = async (id, payload) => {
   return authFetch(`/leads/${id}/cancel-or-hold`, {
     method: 'POST',
     body: JSON.stringify(payload)
+  });
+};
+
+// 45. Dynamic Refund Calendar & Diary System (Excluding Sat, Sun & Festivals, Daily Cap ₹25k)
+export const apiGetRefundCalendar = async (year, month) => {
+  const query = new URLSearchParams({ year: String(year), month: String(month) }).toString();
+  return authFetch(`/leads/refund-calendar?${query}`);
+};
+
+export const apiRescheduleRefund = async (id, rescheduleData) => {
+  return authFetch(`/leads/${id}/reschedule-refund`, {
+    method: 'PUT',
+    body: JSON.stringify(rescheduleData)
+  });
+};
+
+export const apiMarkRefunded = async (id, payoutData = {}) => {
+  return authFetch(`/leads/${id}/mark-refunded`, {
+    method: 'PUT',
+    body: JSON.stringify(payoutData)
   });
 };
 
