@@ -706,3 +706,12 @@ export const apiReapplyCandidate = async (id, reapplyData) => {
 export const apiGetCandidateApplications = async (id) => {
   return authFetch(`/leads/${id}/applications`);
 };
+
+// 44. Smart Cancel or Hold Lead (Strict rule: Cancel only if payment received, else Hold)
+export const apiCancelOrHoldLead = async (id, payload) => {
+  return authFetch(`/leads/${id}/cancel-or-hold`, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+};
+
