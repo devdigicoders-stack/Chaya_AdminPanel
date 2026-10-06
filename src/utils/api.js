@@ -743,3 +743,6 @@ export const apiSendMedicalReportPdf = async (id, payload = {}) => {
 };
 
 
+
+
+
