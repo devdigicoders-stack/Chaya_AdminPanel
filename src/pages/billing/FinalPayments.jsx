@@ -434,6 +434,26 @@ export default function FinalPayments() {
                             </button>
                           )}
 
+                          {/* Quick Print Receipt */}
+                          <button
+                            type="button"
+                            onClick={() => printInvoiceReceipt(candidate)}
+                            className="h-7 w-7 border border-gray-200 hover:bg-blue-50 hover:text-blue-600 text-gray-700 rounded-lg flex items-center justify-center transition-colors cursor-pointer"
+                            title="Quick Print Settlement Voucher"
+                          >
+                            <Printer className="w-3.5 h-3.5" />
+                          </button>
+
+                          {/* Quick Download PDF */}
+                          <button
+                            type="button"
+                            onClick={() => generateInvoicePdf(candidate, { download: true })}
+                            className="h-7 w-7 border border-gray-200 hover:bg-emerald-50 hover:text-emerald-600 text-gray-700 rounded-lg flex items-center justify-center transition-colors cursor-pointer"
+                            title="Quick Download PDF Voucher"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                          </button>
+
                           {/* View Receipt */}
                           <button
                             onClick={() => setViewReceiptModal(candidate)}

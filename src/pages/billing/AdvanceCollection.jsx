@@ -530,15 +530,35 @@ export default function AdvanceCollection() {
                             <span>{isPaid ? 'Update' : 'Collect'}</span>
                           </button>
 
-                          {/* View Receipt */}
+                          {/* View Receipt & Print/Download */}
                           {isPaid && (
-                            <button
-                              onClick={() => setViewReceiptModal(candidate)}
-                              className="h-7 w-7 border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg flex items-center justify-center transition-colors cursor-pointer"
-                              title="View Advance Receipt"
-                            >
-                              <Eye className="w-3.5 h-3.5 text-gray-500" />
-                            </button>
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => printInvoiceReceipt(candidate)}
+                                className="h-7 w-7 border border-gray-200 hover:bg-blue-50 hover:text-blue-600 text-gray-700 rounded-lg flex items-center justify-center transition-colors cursor-pointer"
+                                title="Quick Print Advance Voucher"
+                              >
+                                <Printer className="w-3.5 h-3.5" />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => generateInvoicePdf(candidate, { download: true })}
+                                className="h-7 w-7 border border-gray-200 hover:bg-purple-50 hover:text-purple-600 text-gray-700 rounded-lg flex items-center justify-center transition-colors cursor-pointer"
+                                title="Quick Download PDF Voucher"
+                              >
+                                <Download className="w-3.5 h-3.5" />
+                              </button>
+
+                              <button
+                                onClick={() => setViewReceiptModal(candidate)}
+                                className="h-7 w-7 border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg flex items-center justify-center transition-colors cursor-pointer"
+                                title="View Advance Receipt"
+                              >
+                                <Eye className="w-3.5 h-3.5 text-gray-500" />
+                              </button>
+                            </>
                           )}
 
                         </div>

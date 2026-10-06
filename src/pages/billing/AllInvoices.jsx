@@ -670,6 +670,16 @@ export default function AllInvoices() {
                             <Printer className="w-3.5 h-3.5" />
                           </button>
 
+                          {/* Quick Download PDF */}
+                          <button
+                            type="button"
+                            onClick={() => generateInvoicePdf(lead, { download: true })}
+                            className="h-7 w-7 border border-gray-200 hover:bg-emerald-50 hover:text-emerald-600 text-gray-700 rounded-lg flex items-center justify-center transition-colors cursor-pointer"
+                            title="Quick Download PDF Invoice"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                          </button>
+
                           {/* View Invoice Dossier */}
                           <button
                             type="button"

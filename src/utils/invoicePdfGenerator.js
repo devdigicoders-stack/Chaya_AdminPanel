@@ -10,15 +10,38 @@ export const getLeadBillingSummary = (lead) => {
   
   const serviceFee = Number(p.serviceFee) || 9500;
   const medicalFee = Number(p.medicalFee) || 2500;
+  const baseBilled = serviceFee + medicalFee;
   
-  const totalBilled = bb.approvedPayable || (serviceFee + medicalFee);
+  // Total Billed: if billBook has an approved payable amount > 0, use it, else default to (serviceFee + medicalFee)
+  const totalBilled = (Number(bb.approvedPayable) > 0)
+    ? Number(bb.approvedPayable)
+    : baseBilled;
   
-  const totalPaid = Number(
-    bb.totalReceived !== undefined 
-      ? bb.totalReceived 
-      : (p.totalPaid !== undefined ? p.totalPaid : (p.advancePaid !== undefined ? p.advancePaid : ((Number(p.servicePaid) || 0) + (Number(p.medicalPaid) || 0))))
-  );
-  
+  // Collect all reported payments across paymentDetails and billBook
+  const directTotalPaid = Number(p.totalPaid);
+  const directAdvancePaid = Number(p.advancePaid);
+  const directItemizedPaid = (Number(p.servicePaid) || 0) + (Number(p.medicalPaid) || 0);
+  const billBookPaid = Number(bb.totalReceived) || 0;
+  const historyPaid = Array.isArray(p.history) && p.history.length > 0
+    ? p.history.reduce((sum, h) => sum + (Number(h.amount) || 0), 0)
+    : 0;
+
+  // Filter for valid positive numbers
+  const validPayments = [
+    directTotalPaid,
+    directAdvancePaid,
+    directItemizedPaid,
+    billBookPaid,
+    historyPaid
+  ].filter((val) => typeof val === 'number' && !isNaN(val) && val > 0);
+
+  let totalPaid = validPayments.length > 0 ? Math.max(...validPayments) : 0;
+
+  // If status is 'FULL' or balanceDue is explicitly 0 and any payment recorded
+  if (p.paymentStatus === 'FULL' || (p.balanceDue === 0 && (totalPaid > 0 || p.lastPaymentDate))) {
+    totalPaid = Math.max(totalPaid, totalBilled);
+  }
+
   const balance = Math.max(0, totalBilled - totalPaid);
   const status = balance === 0 && totalPaid > 0 ? 'SETTLED' : totalPaid > 0 ? 'PARTIAL' : 'OPEN';
   const receiptNo = p.receiptNo || (lead._id ? `REC-FIN-${lead._id.substring(lead._id.length - 4).toUpperCase()}` : 'REC-FIN-8428');
@@ -103,7 +126,12 @@ export const generateInvoicePdf = (lead, options = { download: true, returnBlob:
   doc.setFontSize(11);
   doc.text('OFFICIAL BILLING INVOICE & PAYMENT RECEIPT', pageWidth / 2, y + 5.5, { align: 'center' });
 
-  const statusLabel = summary.status === 'SETTLED' ? 'FULL PAYMENT RECEIVED & SETTLED' : summary.status === 'PARTIAL' ? 'PARTIALLY PAID (BALANCE PENDING)' : 'PAYMENT PENDING';
+  const statusLabel = summary.status === 'SETTLED' 
+    ? 'FULL PAYMENT RECEIVED & SETTLED' 
+    : summary.status === 'PARTIAL' 
+      ? `PARTIALLY PAID (BALANCE PENDING: Rs. ${summary.balance.toLocaleString('en-IN')})` 
+      : 'PAYMENT PENDING';
+
   doc.setFontSize(7.5);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(5, 150, 105);
@@ -120,10 +148,30 @@ export const generateInvoicePdf = (lead, options = { download: true, returnBlob:
   const colW = contentWidth / 2;
   const rowH = 6.2;
   const candidateRows = [
-    ['Candidate Name', lead.candidateName || lead.name || 'N/A', 'Case / Client ID', lead.leadId || lead.candidateCode || lead._id?.slice(-8) || 'N/A'],
-    ['Contact Mobile', lead.phone || 'N/A', 'Passport Number', lead.passportNumber || 'N/A'],
-    ['Destination Country', lead.country || lead.targetCountry || 'Gulf Region', 'Applied Trade / Role', lead.trade || 'General Worker'],
-    ['Current Desk', lead.stage || lead.currentStage || 'ACCOUNTS_COLLECTION', 'Payment Method', summary.paymentMode || 'NetBanking / UPI']
+    [
+      'Candidate Name', 
+      lead.candidateName || lead.name || lead.applicationForm?.fullName || 'N/A', 
+      'Case / Client ID', 
+      lead.leadId || lead.candidateCode || (lead._id ? lead._id.slice(-8).toUpperCase() : 'N/A')
+    ],
+    [
+      'Contact Mobile', 
+      lead.phone || lead.applicationForm?.phone || 'N/A', 
+      'Passport Number', 
+      lead.passportNumber || lead.applicationForm?.passportNumber || 'N/A'
+    ],
+    [
+      'Destination Country', 
+      lead.country || lead.targetCountry || lead.applicationForm?.country || 'Gulf Region', 
+      'Applied Trade / Role', 
+      lead.trade || lead.applicationForm?.trade || 'General Worker'
+    ],
+    [
+      'Current Desk', 
+      lead.stage || lead.currentStage || 'ACCOUNTS_COLLECTION', 
+      'Payment Method', 
+      summary.paymentMode || 'NetBanking / UPI'
+    ]
   ];
 
   candidateRows.forEach((row, i) => {
@@ -203,29 +251,30 @@ export const generateInvoicePdf = (lead, options = { download: true, returnBlob:
     doc.text(item.code, margin + 105, y + 4.7);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(15, 23, 42);
-    doc.text(`₹ ${item.amount.toLocaleString('en-IN')}`, pageWidth - margin - 3, y + 4.7, { align: 'right' });
+    // Use standard ASCII "Rs." to avoid WinAnsi font encoding corruption in jsPDF
+    doc.text(`Rs. ${item.amount.toLocaleString('en-IN')}`, pageWidth - margin - 3, y + 4.7, { align: 'right' });
 
     y += 7;
   });
 
   // Totals Box
   y += 2;
-  const totW = 85;
+  const totW = 90;
   const totX = pageWidth - margin - totW;
   
   // Total Billed Row
   doc.setFillColor(248, 250, 252);
-  doc.rect(totX, y, totW, 6, 'F');
+  doc.rect(totX, y, totW, 6.2, 'F');
   doc.setDrawColor(226, 232, 240);
-  doc.rect(totX, y, totW, 6, 'S');
+  doc.rect(totX, y, totW, 6.2, 'S');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
   doc.setTextColor(71, 85, 105);
-  doc.text('TOTAL BILLED AMOUNT:', totX + 3, y + 4.2);
+  doc.text('TOTAL BILLED AMOUNT:', totX + 3, y + 4.3);
   doc.setTextColor(37, 99, 235);
-  doc.text(`₹ ${summary.totalBilled.toLocaleString('en-IN')}`, totX + totW - 3, y + 4.2, { align: 'right' });
+  doc.text(`Rs. ${summary.totalBilled.toLocaleString('en-IN')}`, totX + totW - 3, y + 4.3, { align: 'right' });
 
-  y += 6;
+  y += 6.2;
   // Total Paid Row
   doc.setFillColor(236, 253, 245);
   doc.rect(totX, y, totW, 6.5, 'F');
@@ -236,7 +285,7 @@ export const generateInvoicePdf = (lead, options = { download: true, returnBlob:
   doc.setTextColor(6, 95, 70);
   doc.text('TOTAL AMOUNT RECEIVED:', totX + 3, y + 4.5);
   doc.setTextColor(5, 150, 105);
-  doc.text(`₹ ${summary.totalPaid.toLocaleString('en-IN')}`, totX + totW - 3, y + 4.5, { align: 'right' });
+  doc.text(`Rs. ${summary.totalPaid.toLocaleString('en-IN')}`, totX + totW - 3, y + 4.5, { align: 'right' });
 
   y += 6.5;
   // Outstanding Balance Row
@@ -248,7 +297,7 @@ export const generateInvoicePdf = (lead, options = { download: true, returnBlob:
   doc.setFontSize(8.5);
   doc.setTextColor(summary.balance > 0 ? 180 : 100, summary.balance > 0 ? 83 : 116, summary.balance > 0 ? 9 : 139);
   doc.text('OUTSTANDING BALANCE:', totX + 3, y + 4.5);
-  doc.text(`₹ ${summary.balance.toLocaleString('en-IN')}`, totX + totW - 3, y + 4.5, { align: 'right' });
+  doc.text(`Rs. ${summary.balance.toLocaleString('en-IN')}`, totX + totW - 3, y + 4.5, { align: 'right' });
 
   // 6. PAYMENT TRANSACTION & AUDIT RECORD
   y += 12;
@@ -283,7 +332,7 @@ export const generateInvoicePdf = (lead, options = { download: true, returnBlob:
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6.5);
   doc.setTextColor(148, 163, 184);
-  doc.text(lead.candidateName || 'Candidate', margin + sigBoxW / 2, y + sigBoxH - 2.5, { align: 'center' });
+  doc.text(lead.candidateName || lead.name || 'Candidate', margin + sigBoxW / 2, y + sigBoxH - 2.5, { align: 'center' });
 
   // Box 2: Accounts Officer
   const box2X = margin + sigBoxW + 5;
@@ -305,14 +354,15 @@ export const generateInvoicePdf = (lead, options = { download: true, returnBlob:
   doc.setTextColor(71, 85, 105);
   doc.text('OFFICIAL SEAL & STAMP', box3X + sigBoxW / 2, y + 4.5, { align: 'center' });
 
-  // Green verification seal stamp
-  doc.setDrawColor(16, 185, 129);
+  // Verification seal stamp
+  const isSettled = summary.status === 'SETTLED';
+  doc.setDrawColor(isSettled ? 16 : 217, isSettled ? 185 : 119, isSettled ? 129 : 6);
   doc.setLineWidth(0.8);
   doc.roundedRect(box3X + 6, y + 6.5, sigBoxW - 12, 10, 1.5, 1.5, 'S');
-  doc.setTextColor(5, 150, 105);
+  doc.setTextColor(isSettled ? 5 : 180, isSettled ? 150 : 83, isSettled ? 105 : 9);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7.5);
-  doc.text('PAID & VERIFIED', box3X + sigBoxW / 2, y + 11.5, { align: 'center' });
+  doc.text(isSettled ? 'PAID & VERIFIED' : 'PARTIAL PAYMENT', box3X + sigBoxW / 2, y + 11.5, { align: 'center' });
   doc.setFontSize(5.5);
   doc.text('CHHAYA INTL PVT LTD', box3X + sigBoxW / 2, y + 14.5, { align: 'center' });
 
@@ -329,7 +379,8 @@ export const generateInvoicePdf = (lead, options = { download: true, returnBlob:
   doc.setFontSize(6.5);
   doc.text(`Official Tax Invoice & Payment Receipt • Generated on ${new Date().toLocaleString('en-IN')} • Valid Without Physical Signature`, pageWidth / 2, pageHeight - 3, { align: 'center' });
 
-  const fileName = `Invoice_${summary.receiptNo}_${(lead.candidateName || 'Candidate').replace(/\s+/g, '_')}.pdf`;
+  const candidateCleanName = (lead.candidateName || lead.name || 'Candidate').replace(/\s+/g, '_');
+  const fileName = `Invoice_${summary.receiptNo}_${candidateCleanName}.pdf`;
 
   if (options.download) {
     doc.save(fileName);
@@ -348,6 +399,13 @@ export const generateInvoicePdf = (lead, options = { download: true, returnBlob:
 export const printInvoiceReceipt = (lead) => {
   if (!lead) return;
   const summary = getLeadBillingSummary(lead);
+
+  const candidateName = lead.candidateName || lead.name || lead.applicationForm?.fullName || 'Candidate';
+  const passportNumber = lead.passportNumber || lead.applicationForm?.passportNumber || 'N/A';
+  const phone = lead.phone || lead.applicationForm?.phone || 'N/A';
+  const trade = lead.trade || lead.applicationForm?.trade || 'General Worker';
+  const country = lead.country || lead.targetCountry || lead.applicationForm?.country || 'Gulf Region';
+  const leadId = lead.leadId || lead.candidateCode || (lead._id ? lead._id.substring(lead._id.length - 8).toUpperCase() : 'N/A');
 
   const printContent = `
 <!DOCTYPE html>
@@ -570,6 +628,10 @@ export const printInvoiceReceipt = (lead) => {
       display: inline-block;
       margin: auto;
     }
+    .seal-stamp.partial {
+      border-color: #f59e0b;
+      color: #b45309;
+    }
     .sig-sub {
       font-size: 10px;
       color: #94a3b8;
@@ -626,21 +688,21 @@ export const printInvoiceReceipt = (lead) => {
       <table class="grid-table">
         <tr>
           <td class="label">Candidate Name</td>
-          <td class="val">${lead.candidateName || lead.name || 'N/A'}</td>
+          <td class="val">${candidateName}</td>
           <td class="label">Case / Client ID</td>
-          <td class="val">${lead.leadId || lead.candidateCode || (lead._id ? lead._id.substring(lead._id.length - 8) : 'N/A')}</td>
+          <td class="val">${leadId}</td>
         </tr>
         <tr>
           <td class="label">Passport Number</td>
-          <td class="val" style="font-family: monospace;">${lead.passportNumber || 'N/A'}</td>
+          <td class="val" style="font-family: monospace;">${passportNumber}</td>
           <td class="label">Mobile Phone</td>
-          <td class="val">${lead.phone || 'N/A'}</td>
+          <td class="val">${phone}</td>
         </tr>
         <tr>
           <td class="label">Applied Trade</td>
-          <td class="val">${lead.trade || 'General Worker'}</td>
+          <td class="val">${trade}</td>
           <td class="label">Target Country</td>
-          <td class="val">${lead.country || lead.targetCountry || 'Gulf Region'}</td>
+          <td class="val">${country}</td>
         </tr>
         <tr>
           <td class="label">Payment Mode</td>
@@ -665,13 +727,13 @@ export const printInvoiceReceipt = (lead) => {
             <td class="text-center">1</td>
             <td><strong>Overseas Recruitment & Visa Processing Service Fee</strong><br><span style="color: #64748b; font-size: 10.5px;">Documentation, interview coordination, offer letter verification & desk handling</span></td>
             <td style="color: #64748b; font-family: monospace;">998512</td>
-            <td class="text-right" style="font-weight: 700; font-family: monospace;">₹ ${summary.serviceFee.toLocaleString('en-IN')}</td>
+            <td class="text-right" style="font-weight: 700; font-family: monospace;">Rs. ${summary.serviceFee.toLocaleString('en-IN')}</td>
           </tr>
           <tr>
             <td class="text-center">2</td>
             <td><strong>GAMCA Approved Diagnostic Medical Center Checkup Fee</strong><br><span style="color: #64748b; font-size: 10.5px;">Approved GCC health laboratory fitness test & certificate processing</span></td>
             <td style="color: #64748b; font-family: monospace;">999312</td>
-            <td class="text-right" style="font-weight: 700; font-family: monospace;">₹ ${summary.medicalFee.toLocaleString('en-IN')}</td>
+            <td class="text-right" style="font-weight: 700; font-family: monospace;">Rs. ${summary.medicalFee.toLocaleString('en-IN')}</td>
           </tr>
         </tbody>
       </table>
@@ -679,26 +741,26 @@ export const printInvoiceReceipt = (lead) => {
       <div class="totals-container">
         <div class="tot-row">
           <span>Total Billed Fee:</span>
-          <span style="font-weight: 700; font-family: monospace;">₹ ${summary.totalBilled.toLocaleString('en-IN')}</span>
+          <span style="font-weight: 700; font-family: monospace;">Rs. ${summary.totalBilled.toLocaleString('en-IN')}</span>
         </div>
         <div class="tot-row paid">
           <span>Total Amount Received:</span>
-          <span style="font-family: monospace;">₹ ${summary.totalPaid.toLocaleString('en-IN')}</span>
+          <span style="font-family: monospace;">Rs. ${summary.totalPaid.toLocaleString('en-IN')}</span>
         </div>
         <div class="tot-row balance">
           <span>Outstanding Balance:</span>
-          <span style="font-family: monospace;">₹ ${summary.balance.toLocaleString('en-IN')}</span>
+          <span style="font-family: monospace;">Rs. ${summary.balance.toLocaleString('en-IN')}</span>
         </div>
       </div>
 
       <div class="notes-box">
-        <strong>Payment Audit Verification:</strong> This document certifies receipt of overseas recruitment processing fees for candidate ${lead.candidateName || 'Candidate'}. Official transaction reference: <code>${summary.receiptNo}</code>. Cleared in company accounts register.
+        <strong>Payment Audit Verification:</strong> This document certifies receipt of overseas recruitment processing fees for candidate ${candidateName}. Official transaction reference: <code>${summary.receiptNo}</code>. Cleared in company accounts register.
       </div>
 
       <div class="sig-row">
         <div class="sig-box">
           <div class="sig-title">Candidate Signature</div>
-          <div class="sig-sub">${lead.candidateName || 'Candidate'}</div>
+          <div class="sig-sub">${candidateName}</div>
         </div>
         <div class="sig-box">
           <div class="sig-title">Accounts Officer</div>
@@ -706,7 +768,7 @@ export const printInvoiceReceipt = (lead) => {
         </div>
         <div class="sig-box">
           <div class="sig-title">Official Verification Seal</div>
-          <div class="seal-stamp">✓ PAID & VERIFIED</div>
+          <div class="seal-stamp ${summary.status === 'SETTLED' ? '' : 'partial'}">✓ ${summary.status === 'SETTLED' ? 'PAID & VERIFIED' : 'PARTIAL PAYMENT'}</div>
           <div class="sig-sub">Chhaya International Pvt Ltd</div>
         </div>
       </div>
