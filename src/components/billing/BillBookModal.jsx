@@ -179,49 +179,52 @@ export default function BillBookModal({ isOpen, onClose, lead, onUpdated }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
-      <div className="relative w-full max-w-4xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden my-8">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-2 sm:p-4 md:p-6 overflow-y-auto">
+      <div className="relative w-full max-w-4xl max-h-[92vh] sm:max-h-[88vh] bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden my-auto animate-in zoom-in-95 duration-150">
         
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-blue-700 via-indigo-700 to-slate-900 text-white">
-          <div className="flex items-center space-x-3">
-            <div className="p-2.5 bg-white/10 rounded-xl backdrop-blur-md">
-              <Receipt className="w-6 h-6 text-amber-300" />
+        <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 bg-gradient-to-r from-blue-700 via-indigo-700 to-slate-900 text-white shrink-0 shadow-md">
+          <div className="flex items-center space-x-2.5 sm:space-x-3 min-w-0 pr-2">
+            <div className="p-2 sm:p-2.5 bg-white/10 rounded-xl backdrop-blur-md shrink-0">
+              <Receipt className="w-5 h-5 sm:w-6 sm:h-6 text-amber-300" />
             </div>
-            <div>
-              <h2 className="text-xl font-bold tracking-tight">Official Bill Book & Ledger</h2>
-              <p className="text-xs text-blue-100 opacity-90 flex items-center flex-wrap gap-1 mt-0.5">
+            <div className="min-w-0">
+              <h2 className="text-sm sm:text-lg md:text-xl font-bold tracking-tight truncate">Official Bill Book & Ledger</h2>
+              <p className="text-[11px] sm:text-xs text-blue-100 opacity-90 flex items-center flex-wrap gap-1 mt-0.5">
                 <span>Candidate: <span className="font-semibold text-white">{localLead.name || localLead.candidateName}</span></span> 
-                {localLead.candidateCode && <span className="px-2 py-0.5 bg-blue-500/30 rounded text-[10px] font-mono">{localLead.candidateCode}</span>}
+                {localLead.candidateCode && <span className="px-1.5 py-0.5 bg-blue-500/30 rounded text-[10px] font-mono">{localLead.candidateCode}</span>}
                 <span className="font-mono">({localLead.phone})</span>
                 {localLead.totalApplicationsCount > 1 && (
-                  <span className="px-2 py-0.5 bg-purple-500/40 border border-purple-300/40 rounded text-[10px] font-mono font-bold text-amber-200">
+                  <span className="px-1.5 py-0.5 bg-purple-500/40 border border-purple-300/40 rounded text-[10px] font-mono font-bold text-amber-200">
                     CYCLE #{localLead.totalApplicationsCount} ({localLead.currentApplicationId || 'APP-01'})
                   </span>
                 )}
               </p>
             </div>
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
             <button 
               onClick={() => refreshLocalLead()}
               disabled={refreshing}
               title="Refresh ledger history"
-              className="p-1.5 text-white/80 hover:text-white hover:bg-white/10 rounded-full transition-colors"
+              className="p-1.5 text-white/80 hover:text-white hover:bg-white/10 rounded-full transition-colors cursor-pointer"
             >
-              <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-4 h-4 sm:w-5 sm:h-5 ${refreshing ? 'animate-spin' : ''}`} />
             </button>
             <button 
               onClick={onClose}
-              className="p-1.5 text-white/80 hover:text-white hover:bg-white/10 rounded-full transition-colors"
+              className="p-1.5 text-white/80 hover:text-white hover:bg-white/10 rounded-full transition-colors cursor-pointer"
             >
-              <X className="w-6 h-6" />
+              <X className="w-5 h-5 sm:w-6 sm:h-6" />
             </button>
           </div>
         </div>
 
+        {/* Scrollable Content Body */}
+        <div className="flex-1 overflow-y-auto min-h-0 overscroll-contain">
+
         {/* Ledger Summary Cards */}
-        <div className="p-6 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
+        <div className="p-4 sm:p-6 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="p-4 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
               <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Approved Payable</div>
@@ -528,13 +531,29 @@ export default function BillBookModal({ isOpen, onClose, lead, onUpdated }) {
           </div>
         )}
 
+        </div>
+
+        {/* Modal Sticky Bottom Bar */}
+        <div className="px-4 py-3 sm:px-6 bg-slate-50 dark:bg-slate-800/90 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0 shadow-xs">
+          <div className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400">
+            Total Transactions: <strong className="font-bold text-slate-800 dark:text-slate-200">{transactions.length}</strong>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-1.5 text-xs font-bold bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg transition cursor-pointer"
+          >
+            Close
+          </button>
+        </div>
+
         {/* Add Transaction Modal */}
         {showAddTxModal && (
-          <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/50 p-4">
-            <div className="bg-white dark:bg-slate-800 rounded-xl max-w-md w-full p-5 border border-slate-200 dark:border-slate-700 shadow-xl">
+          <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/70 backdrop-blur-sm p-2 sm:p-4 overflow-y-auto">
+            <div className="bg-white dark:bg-slate-800 rounded-xl sm:rounded-2xl max-w-md w-full p-4 sm:p-5 border border-slate-200 dark:border-slate-700 shadow-2xl max-h-[92vh] overflow-y-auto my-auto">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="font-bold text-slate-900 dark:text-white">Record Bill Book Receipt / Payment</h3>
-                <button onClick={() => setShowAddTxModal(false)}><X className="w-5 h-5 text-slate-400" /></button>
+                <h3 className="font-bold text-slate-900 dark:text-white text-sm sm:text-base">Record Bill Book Receipt / Payment</h3>
+                <button onClick={() => setShowAddTxModal(false)} className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"><X className="w-5 h-5" /></button>
               </div>
 
               <form onSubmit={handleAddTransaction} className="space-y-3">
@@ -606,14 +625,14 @@ export default function BillBookModal({ isOpen, onClose, lead, onUpdated }) {
                   <button 
                     type="button" 
                     onClick={() => setShowAddTxModal(false)}
-                    className="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded-lg"
+                    className="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button 
-                    type="submit"
+                    type="submit" 
                     disabled={loading}
-                    className="px-4 py-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-sm"
+                    className="px-4 py-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-sm cursor-pointer"
                   >
                     {loading ? 'Recording...' : 'Save Receipt'}
                   </button>
@@ -625,11 +644,11 @@ export default function BillBookModal({ isOpen, onClose, lead, onUpdated }) {
 
         {/* Add Charge Modal */}
         {showAddChargeModal && (
-          <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/50 p-4">
-            <div className="bg-white dark:bg-slate-800 rounded-xl max-w-md w-full p-5 border border-slate-200 dark:border-slate-700 shadow-xl">
+          <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/70 backdrop-blur-sm p-2 sm:p-4 overflow-y-auto">
+            <div className="bg-white dark:bg-slate-800 rounded-xl sm:rounded-2xl max-w-md w-full p-4 sm:p-5 border border-slate-200 dark:border-slate-700 shadow-2xl max-h-[92vh] overflow-y-auto my-auto">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="font-bold text-slate-900 dark:text-white">Add Approved Charge to Ledger</h3>
-                <button onClick={() => setShowAddChargeModal(false)}><X className="w-5 h-5 text-slate-400" /></button>
+                <h3 className="font-bold text-slate-900 dark:text-white text-sm sm:text-base">Add Approved Charge to Ledger</h3>
+                <button onClick={() => setShowAddChargeModal(false)} className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"><X className="w-5 h-5" /></button>
               </div>
 
               <form onSubmit={handleAddCharge} className="space-y-3">

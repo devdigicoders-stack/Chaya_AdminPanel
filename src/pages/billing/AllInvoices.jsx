@@ -1,14 +1,15 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { 
-  ChevronRight, Plus, Download, FileText, Banknote, Hourglass, 
-  AlertCircle, CreditCard, ArrowUpRight, CheckCircle2, RotateCcw, 
+  ChevronRight, Download, FileText, Banknote, Hourglass, 
+  AlertCircle, CreditCard, CheckCircle2, 
   Search, RefreshCw, Loader2, Eye, Receipt, Printer, X, Check,
-  UserCheck, ShieldCheck, AlertTriangle, ExternalLink, Volume2, FileCheck2, MessageCircle
+  ShieldCheck, AlertTriangle, ExternalLink, Volume2, FileCheck2, MessageCircle
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import { apiGetLeads, apiRecordPaymentBooking, apiRecordFinalPayment, apiSendMedicalReportPdf } from '../../utils/api';
 import BillBookModal from '../../components/billing/BillBookModal';
+import { generateInvoicePdf, printInvoiceReceipt } from '../../utils/invoicePdfGenerator';
 
 export default function AllInvoices() {
   const navigate = useNavigate();
@@ -659,8 +660,19 @@ export default function AllInvoices() {
                             <span>Ledger</span>
                           </button>
 
+                          {/* Quick Print Invoice Receipt */}
+                          <button
+                            type="button"
+                            onClick={() => printInvoiceReceipt(lead)}
+                            className="h-7 w-7 border border-gray-200 hover:bg-blue-50 hover:text-blue-600 text-gray-700 rounded-lg flex items-center justify-center transition-colors cursor-pointer"
+                            title="Quick Print Invoice / Receipt"
+                          >
+                            <Printer className="w-3.5 h-3.5" />
+                          </button>
+
                           {/* View Invoice Dossier */}
                           <button
+                            type="button"
                             onClick={() => setViewInvoiceLead(lead)}
                             className="h-7 w-7 border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg flex items-center justify-center transition-colors cursor-pointer"
                             title="View Invoice & Receipt"
@@ -682,31 +694,35 @@ export default function AllInvoices() {
 
       {/* 5. View Invoice Dossier Modal */}
       {viewInvoiceLead && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-2 sm:p-4 overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 w-full max-w-lg max-h-[92vh] sm:max-h-[88vh] flex flex-col overflow-hidden my-auto animate-in zoom-in-95 duration-200">
             
-            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between bg-blue-50/70">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold">
+            <div className="px-5 py-3.5 sm:py-4 border-b border-gray-100 flex items-center justify-between bg-blue-50/70 shrink-0">
+              <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold shrink-0 shadow-xs">
                   <Receipt className="w-4 h-4" />
                 </div>
-                <div>
-                  <h3 className="font-bold text-gray-900 text-sm">Official Billing & Invoice Statement</h3>
-                  <p className="text-[11px] text-gray-500">{viewInvoiceLead.candidateName} • {viewInvoiceLead.passportNumber || 'No Passport'}</p>
+                <div className="min-w-0">
+                  <h3 className="font-bold text-gray-900 text-sm truncate">Official Billing & Invoice Statement</h3>
+                  <p className="text-[11px] text-gray-500 truncate">{viewInvoiceLead.candidateName} • {viewInvoiceLead.passportNumber || 'No Passport'}</p>
                 </div>
               </div>
-              <button onClick={() => setViewInvoiceLead(null)} className="w-7 h-7 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center cursor-pointer">
+              <button 
+                type="button"
+                onClick={() => setViewInvoiceLead(null)} 
+                className="w-7 h-7 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center cursor-pointer shrink-0 transition"
+              >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="p-5 space-y-4 text-xs">
+            <div className="p-4 sm:p-5 space-y-4 text-xs flex-1 overflow-y-auto overscroll-contain">
               
               <div className="p-3.5 bg-gray-50 rounded-xl border border-gray-200 space-y-2">
-                <div className="flex justify-between">
+                <div className="flex justify-between items-center">
                   <span className="text-gray-500">Invoice / Receipt No:</span>
-                  <span className="font-bold font-mono text-gray-900">
-                    {viewInvoiceLead.paymentDetails?.receiptNo || `INV-${viewInvoiceLead._id.substring(viewInvoiceLead._id.length - 6).toUpperCase()}`}
+                  <span className="font-bold font-mono text-gray-900 text-xs sm:text-sm">
+                    {viewInvoiceLead.paymentDetails?.receiptNo || `REC-FIN-${viewInvoiceLead._id ? viewInvoiceLead._id.substring(viewInvoiceLead._id.length - 4).toUpperCase() : '8428'}`}
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -742,27 +758,40 @@ export default function AllInvoices() {
                 <div className="flex justify-between pt-1">
                   <span className="text-gray-500">Payment Mode & Date:</span>
                   <span className="text-gray-800 font-medium">
-                    {viewInvoiceLead.paymentDetails?.paymentMode || 'UPI'} • {viewInvoiceLead.paymentDetails?.lastPaymentDate ? new Date(viewInvoiceLead.paymentDetails.lastPaymentDate).toLocaleDateString() : 'N/A'}
+                    {viewInvoiceLead.paymentDetails?.paymentMode || 'NetBanking'} • {viewInvoiceLead.paymentDetails?.lastPaymentDate ? new Date(viewInvoiceLead.paymentDetails.lastPaymentDate).toLocaleDateString() : 'N/A'}
                   </span>
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-2">
-                <button
-                  onClick={() => alert('Printing official tax receipt & invoice statement...')}
-                  className="h-9 px-3.5 border border-gray-200 hover:bg-gray-50 rounded-xl text-xs font-semibold text-gray-700 flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>Print Receipt</span>
-                </button>
-                <button
-                  onClick={() => setViewInvoiceLead(null)}
-                  className="h-9 px-4 bg-gray-900 hover:bg-black text-white rounded-xl text-xs font-bold cursor-pointer"
-                >
-                  Close
-                </button>
-              </div>
+            </div>
 
+            {/* Sticky Actions Footer */}
+            <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-2 shrink-0 flex-wrap">
+              <button
+                type="button"
+                onClick={() => printInvoiceReceipt(viewInvoiceLead)}
+                className="h-9 px-3.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs transition"
+                title="Print official receipt via browser print preview"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                <span>Print Receipt</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => generateInvoicePdf(viewInvoiceLead, { download: true })}
+                className="h-9 px-3.5 border border-gray-200 hover:bg-gray-100 active:scale-95 rounded-xl text-xs font-semibold text-gray-700 flex items-center gap-1.5 cursor-pointer transition bg-white"
+                title="Download official PDF invoice file"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Download PDF</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewInvoiceLead(null)}
+                className="h-9 px-4 bg-gray-900 hover:bg-black text-white rounded-xl text-xs font-bold cursor-pointer transition"
+              >
+                Close
+              </button>
             </div>
 
           </div>

@@ -755,17 +755,17 @@ export default function MedicalTable({ leads = [], loading = false, onRefresh })
 
       {/* View Medical Report Modal */}
       {viewReportModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in">
-          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 w-full max-w-lg overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-blue-50/70">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-2 sm:p-4 overflow-y-auto animate-in fade-in">
+          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 w-full max-w-lg max-h-[92vh] sm:max-h-[88vh] flex flex-col overflow-hidden my-auto">
+            <div className="px-4 py-3 sm:px-6 sm:py-4 border-b border-gray-100 flex items-center justify-between bg-blue-50/70 shrink-0">
               <div className="flex items-center gap-2">
                 <ShieldCheck className="w-5 h-5 text-blue-600" />
-                <h3 className="font-bold text-gray-900 text-[15px]">GAMCA Health Certificate & Lab Report</h3>
+                <h3 className="font-bold text-gray-900 text-sm sm:text-[15px]">GAMCA Health Certificate & Lab Report</h3>
               </div>
-              <button onClick={() => setViewReportModal(null)} className="text-gray-400 hover:text-gray-600 text-xl font-bold cursor-pointer">×</button>
+              <button onClick={() => setViewReportModal(null)} className="text-gray-400 hover:text-gray-600 text-xl font-bold cursor-pointer p-1">×</button>
             </div>
             
-            <div className="p-6 space-y-4 text-[13px]">
+            <div className="p-4 sm:p-6 space-y-4 text-[13px] flex-1 overflow-y-auto overscroll-contain">
               <div className="grid grid-cols-2 gap-3 bg-gray-50 p-4 rounded-xl">
                 <div><span className="text-gray-400 text-[11px] uppercase tracking-wider block">Candidate</span> <span className="font-bold text-gray-900">{viewReportModal.candidateName}</span></div>
                 <div><span className="text-gray-400 text-[11px] uppercase tracking-wider block">Passport No.</span> <span className="font-mono font-bold text-gray-900">{viewReportModal.passportNumber || 'N/A'}</span></div>
@@ -818,7 +818,7 @@ export default function MedicalTable({ leads = [], loading = false, onRefresh })
               </div>
             </div>
 
-            <div className="px-6 py-3 bg-gray-50 border-t border-gray-100 flex justify-end gap-2">
+            <div className="px-4 py-3 sm:px-6 bg-gray-50 border-t border-gray-100 flex justify-end gap-2 shrink-0">
               <button onClick={() => setViewReportModal(null)} className="px-4 py-2 bg-gray-800 text-white rounded-lg text-[12.5px] font-medium cursor-pointer hover:bg-gray-900">
                 Close Preview
               </button>
@@ -829,14 +829,14 @@ export default function MedicalTable({ leads = [], loading = false, onRefresh })
 
       {/* Update Fitness Status Modal (FIT vs UNFIT) */}
       {updateStatusModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in">
-          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 w-full max-w-md overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-teal-50/70">
-              <h3 className="font-bold text-gray-900 text-[15px]">Record GAMCA Medical Fitness</h3>
-              <button onClick={() => setUpdateStatusModal(null)} className="text-gray-400 hover:text-gray-600 text-xl font-bold cursor-pointer">×</button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-2 sm:p-4 overflow-y-auto animate-in fade-in">
+          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 w-full max-w-md max-h-[92vh] sm:max-h-[88vh] flex flex-col overflow-hidden my-auto">
+            <div className="px-4 py-3 sm:px-6 sm:py-4 border-b border-gray-100 flex items-center justify-between bg-teal-50/70 shrink-0">
+              <h3 className="font-bold text-gray-900 text-sm sm:text-[15px]">Record GAMCA Medical Fitness</h3>
+              <button onClick={() => setUpdateStatusModal(null)} className="text-gray-400 hover:text-gray-600 text-xl font-bold cursor-pointer p-1">×</button>
             </div>
 
-            <form onSubmit={handleSaveStatus} className="p-6 space-y-4 text-[13px]">
+            <form onSubmit={handleSaveStatus} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 text-[13px] flex flex-col min-h-0 overscroll-contain">
               <div className="bg-gray-50 p-3 rounded-xl">
                 <div className="font-bold text-gray-900">{updateStatusModal.candidateName}</div>
                 <div className="text-gray-500 font-mono text-[11.5px] mt-0.5">Passport: {updateStatusModal.passportNumber || 'N/A'} • ID: {updateStatusModal.leadId}</div>
@@ -920,7 +920,7 @@ export default function MedicalTable({ leads = [], loading = false, onRefresh })
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-100">
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-100 shrink-0">
                 <button
                   type="button"
                   onClick={() => setUpdateStatusModal(null)}

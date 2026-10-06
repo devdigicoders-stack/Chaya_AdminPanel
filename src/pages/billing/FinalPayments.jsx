@@ -2,11 +2,12 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   ChevronRight, DollarSign, Receipt, CheckCircle2, Search, 
   RefreshCw, Loader2, ArrowRight, Banknote, AlertCircle, 
-  CreditCard, Eye, Printer, X, Check, ShieldCheck, Plane
+  CreditCard, Eye, Printer, X, Check, ShieldCheck, Plane, Download
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import { apiGetLeads, apiRecordFinalPayment } from '../../utils/api';
+import { generateInvoicePdf, printInvoiceReceipt } from '../../utils/invoicePdfGenerator';
 
 export default function FinalPayments() {
   const navigate = useNavigate();
@@ -629,17 +630,29 @@ export default function FinalPayments() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-2">
+              <div className="flex items-center justify-end gap-2 pt-2 flex-wrap">
                 <button
-                  onClick={() => alert('Printing final accounts settlement clearance...')}
-                  className="h-9 px-3.5 border border-gray-200 hover:bg-gray-50 rounded-xl text-xs font-semibold text-gray-700 flex items-center gap-1.5 cursor-pointer"
+                  type="button"
+                  onClick={() => printInvoiceReceipt(viewReceiptModal)}
+                  className="h-9 px-3.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs transition"
+                  title="Print official settlement voucher"
                 >
                   <Printer className="w-3.5 h-3.5" />
                   <span>Print Voucher</span>
                 </button>
                 <button
+                  type="button"
+                  onClick={() => generateInvoicePdf(viewReceiptModal, { download: true })}
+                  className="h-9 px-3.5 border border-gray-200 hover:bg-gray-100 active:scale-95 rounded-xl text-xs font-semibold text-gray-700 flex items-center gap-1.5 cursor-pointer transition bg-white"
+                  title="Download official PDF voucher"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download PDF</span>
+                </button>
+                <button
+                  type="button"
                   onClick={() => setViewReceiptModal(null)}
-                  className="h-9 px-4 bg-gray-900 hover:bg-black text-white rounded-xl text-xs font-bold cursor-pointer"
+                  className="h-9 px-4 bg-gray-900 hover:bg-black text-white rounded-xl text-xs font-bold cursor-pointer transition"
                 >
                   Close
                 </button>

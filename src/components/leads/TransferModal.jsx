@@ -66,32 +66,33 @@ export default function TransferModal({ isOpen, onClose, lead, onUpdated }) {
   const activeHolderName = lead.activeHolder?.name || lead.assignedTo?.name || 'Unassigned';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
-      <div className="relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-2 sm:p-4 overflow-y-auto">
+      <div className="relative w-full max-w-lg max-h-[92vh] sm:max-h-[88vh] bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden my-auto animate-in zoom-in-95 duration-150">
         
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-blue-700 via-indigo-800 to-slate-900 text-white">
-          <div className="flex items-center space-x-3">
-            <div className="p-2 bg-white/10 rounded-xl">
-              <Send className="w-6 h-6 text-amber-300" />
+        <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 bg-gradient-to-r from-blue-700 via-indigo-800 to-slate-900 text-white shrink-0 shadow-md">
+          <div className="flex items-center space-x-2.5 sm:space-x-3 min-w-0 pr-2">
+            <div className="p-2 bg-white/10 rounded-xl shrink-0">
+              <Send className="w-5 h-5 sm:w-6 sm:h-6 text-amber-300" />
             </div>
-            <div>
-              <h2 className="text-lg font-bold">Initiate File Handover Protocol</h2>
-              <p className="text-xs text-blue-100 opacity-90">
+            <div className="min-w-0">
+              <h2 className="text-sm sm:text-base md:text-lg font-bold truncate">Initiate File Handover Protocol</h2>
+              <p className="text-[11px] sm:text-xs text-blue-100 opacity-90 truncate">
                 Single Active File Holder Transfer (Two-Party Acceptance)
               </p>
             </div>
           </div>
           <button 
+            type="button"
             onClick={onClose}
-            className="p-1.5 text-white/80 hover:text-white hover:bg-white/10 rounded-full transition-colors"
+            className="p-1.5 text-white/80 hover:text-white hover:bg-white/10 rounded-full transition-colors shrink-0 cursor-pointer"
           >
-            <X className="w-6 h-6" />
+            <X className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
         </div>
 
-        {/* Current State Info */}
-        <div className="p-6 space-y-4">
+        {/* Current State Info & Scrollable Form */}
+        <div className="flex-1 overflow-y-auto min-h-0 p-4 sm:p-6 space-y-4 overscroll-contain">
           <div className="p-3 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
             <div className="flex items-center justify-between">
               <div>
