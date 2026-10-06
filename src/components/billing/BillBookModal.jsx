@@ -81,6 +81,9 @@ export default function BillBookModal({ isOpen, onClose, lead, onUpdated }) {
     transactions: []
   };
 
+  const transactions = billBook.transactions || [];
+  const charges = billBook.charges || [];
+
   const [activeTab, setActiveTab] = useState('transactions'); // 'transactions' | 'charges'
   const [showAddTxModal, setShowAddTxModal] = useState(false);
   const [showAddChargeModal, setShowAddChargeModal] = useState(false);
@@ -536,7 +539,7 @@ export default function BillBookModal({ isOpen, onClose, lead, onUpdated }) {
         {/* Modal Sticky Bottom Bar */}
         <div className="px-4 py-3 sm:px-6 bg-slate-50 dark:bg-slate-800/90 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0 shadow-xs">
           <div className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400">
-            Total Transactions: <strong className="font-bold text-slate-800 dark:text-slate-200">{transactions.length}</strong>
+            Total Transactions: <strong className="font-bold text-slate-800 dark:text-slate-200">{(billBook?.transactions || transactions || []).length}</strong>
           </div>
           <button
             type="button"

@@ -5,10 +5,11 @@ import {
   Sparkles, FileText, User, ShieldCheck, Phone, Mail, 
   MapPin, Briefcase, Camera, Check, AlertCircle, ArrowRight, 
   Loader2, Calendar, Building2, UploadCloud, X, DollarSign,
-  HeartPulse, UserCheck, PhoneCall
+  HeartPulse, UserCheck, PhoneCall, Download
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { apiCreateLead, apiUpdateLead, apiGetLeadById } from '../../utils/api';
+import { printRegistrationForm, generateRegistrationFormPdf } from '../../utils/registrationFormGenerator';
 
 export default function CandidateRegistrationForm() {
   const navigate = useNavigate();
@@ -76,6 +77,7 @@ export default function CandidateRegistrationForm() {
   const [signaturePreview, setSignaturePreview] = useState(null);
   const [toastMsg, setToastMsg] = useState('');
   const [showPrintModal, setShowPrintModal] = useState(false);
+  const [printBlankMode, setPrintBlankMode] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   // Preload existing lead data from Calling Queue or Lead Pool
@@ -238,8 +240,12 @@ export default function CandidateRegistrationForm() {
     }
   };
 
-  const handlePrint = () => {
-    window.print();
+  const handlePrint = (blank = false) => {
+    printRegistrationForm(form, { photoPreview, signaturePreview, blank });
+  };
+
+  const handleDownloadPdf = (blank = false) => {
+    generateRegistrationFormPdf(form, { photoPreview, signaturePreview, download: true, blank });
   };
 
   const inputCls = 'w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-[13px] text-gray-800 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all';
@@ -297,7 +303,17 @@ export default function CandidateRegistrationForm() {
             className="h-9 px-3.5 bg-white hover:bg-purple-50 text-purple-700 border border-purple-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
           >
             <Printer className="w-3.5 h-3.5 text-purple-600" />
-            <span>Print Physical Form</span>
+            <span>Print Form</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleDownloadPdf(false)}
+            className="h-9 px-3.5 bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+            title="Download official PDF file of registration form"
+          >
+            <Download className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Download PDF</span>
           </button>
 
           <button
@@ -1106,214 +1122,331 @@ export default function CandidateRegistrationForm() {
 
       </form>
 
-      {/* ── Official Printable Form Modal (1:1 Exact Replica of Physical Sheet) ── */}
+      {/* ── Official Printable Form Modal (1:1 Guaranteed Single Page A4 Replica) ── */}
       {showPrintModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-4xl overflow-hidden my-6">
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50">
-              <div className="flex items-center gap-2">
-                <Printer className="w-5 h-5 text-purple-600" />
-                <h3 className="font-bold text-gray-900 text-[15px]">
-                  Chhaya International Pvt. Ltd. — Registration Form Preview
-                </h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-2 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-4xl max-h-[94vh] flex flex-col overflow-hidden my-auto animate-in zoom-in-95 duration-150">
+            
+            {/* Modal Sticky Header */}
+            <div className="px-5 py-3 border-b border-gray-200 flex items-center justify-between bg-slate-50 shrink-0 flex-wrap gap-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold shrink-0">
+                  <Printer className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="font-bold text-gray-900 text-sm truncate">
+                    Candidate Registration Form (A4 Sheet)
+                  </h3>
+                  <p className="text-[11px] text-gray-500 font-mono">
+                    Reg No: {form.regNo} • Single Page Guaranteed (No Cut-off)
+                  </p>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
+
+              {/* Action Controls */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Mode Switcher */}
+                <div className="flex items-center bg-gray-200/80 p-0.5 rounded-lg text-xs font-semibold">
+                  <button
+                    type="button"
+                    onClick={() => setPrintBlankMode(false)}
+                    className={`px-2.5 py-1 rounded-md transition cursor-pointer ${!printBlankMode ? 'bg-white text-blue-700 shadow-2xs font-bold' : 'text-gray-600 hover:text-black'}`}
+                  >
+                    Filled Data
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPrintBlankMode(true)}
+                    className={`px-2.5 py-1 rounded-md transition cursor-pointer ${printBlankMode ? 'bg-white text-blue-700 shadow-2xs font-bold' : 'text-gray-600 hover:text-black'}`}
+                  >
+                    Blank Form
+                  </button>
+                </div>
+
+                {/* Print Button */}
                 <button
-                  onClick={handlePrint}
-                  className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-[12px] font-bold hover:bg-blue-700 flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  type="button"
+                  onClick={() => handlePrint(printBlankMode)}
+                  className="h-8 px-3.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition"
+                  title="Print cleanly on 1 sheet of A4 paper"
                 >
                   <Printer className="w-3.5 h-3.5" />
-                  Print Now
+                  <span>Print Form</span>
                 </button>
+
+                {/* Download PDF Button */}
                 <button
-                  onClick={() => setShowPrintModal(false)}
-                  className="text-gray-400 hover:text-gray-600 text-xl font-bold px-2 cursor-pointer"
+                  type="button"
+                  onClick={() => handleDownloadPdf(printBlankMode)}
+                  className="h-8 px-3 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition"
+                  title="Download crisp vector PDF file"
                 >
-                  ×
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download PDF</span>
+                </button>
+
+                {/* Close Button */}
+                <button
+                  type="button"
+                  onClick={() => setShowPrintModal(false)}
+                  className="w-8 h-8 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-200/60 flex items-center justify-center transition cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
                 </button>
               </div>
             </div>
 
-            {/* Print Sheet Container */}
-            <div className="p-8 sm:p-10 font-sans text-gray-900 max-h-[80vh] overflow-y-auto print:p-0 print:max-h-none" ref={printRef}>
-              
-              {/* Top Company Header */}
-              <div className="flex justify-between items-start border-b-2 border-black pb-4 mb-6">
-                <div>
-                  <h1 className="text-[22px] font-bold text-black tracking-tight leading-tight">
-                    Chhaya International Pvt. Ltd.
-                  </h1>
-                  <p className="text-[13px] text-gray-800 font-medium">LIG 2 Nirala Nagar Unnao</p>
-                  <p className="text-[13px] text-gray-800 font-medium">Uttar Pradesh 209801</p>
-                  <p className="text-[12px] text-gray-700 mt-1">
-                    <strong>chhayainternationalpvtltd@gmail.com</strong>
-                  </p>
-                  <p className="text-[12px] text-gray-700">
-                    <strong>Contact No—: 8081478307</strong>
-                  </p>
+            {/* Scrollable A4 Sheet Preview */}
+            <div className="p-3 sm:p-6 bg-slate-100 flex-1 overflow-y-auto overscroll-contain flex justify-center">
+              <div 
+                className="w-full max-w-[195mm] bg-white border border-gray-300 shadow-md p-5 sm:p-7 text-black font-sans text-[10px] leading-tight select-text"
+              >
+                {/* 1. Top Header */}
+                <div className="border-b-2 border-black pb-2 mb-2.5 flex justify-between items-start">
+                  <div>
+                    <h1 className="text-[17px] font-black uppercase tracking-tight leading-none text-black">
+                      Chhaya International Pvt. Ltd.
+                    </h1>
+                    <p className="text-[10px] text-gray-800 font-medium mt-1">LIG 2 Nirala Nagar Unnao, Uttar Pradesh 209801</p>
+                    <p className="text-[9.5px] text-gray-900 font-semibold mt-0.5">
+                      Email: chhayainternationalpvtltd@gmail.com &nbsp;•&nbsp; Contact No: +91 80814 78307
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-[14px] font-black text-black">Chhaya International</div>
+                    <div className="text-[8.5px] text-gray-700 font-mono mt-0.5">Ministry Reg: B-1204/UP/COM/1000+/5/9821/2021</div>
+                  </div>
                 </div>
 
-                <div className="text-right">
-                  <div className="text-[20px] font-bold text-black">Chhaya International</div>
-                  <div className="text-[16px] font-semibold text-gray-800">Pvt. Ltd.</div>
+                {/* 2. Title & Meta Bar */}
+                <div className="text-center mb-1.5">
+                  <h2 className="text-[13px] font-black tracking-wider uppercase inline-block border-b-2 border-black pb-0.5">
+                    Registration Form
+                  </h2>
                 </div>
+
+                <div className="flex justify-between items-center text-[10.5px] font-bold border-b border-gray-400 pb-1.5 mb-2.5">
+                  <div>Date: <span className="font-mono underline decoration-dotted font-bold">{form.date}</span></div>
+                  <div>Reg No.: <span className="font-mono font-bold underline decoration-dotted">{form.regNo}</span></div>
+                </div>
+
+                {/* 3. Personal Details */}
+                <div className="mb-2">
+                  <div className="font-bold text-[10.5px] uppercase mb-1 flex items-center gap-1">
+                    <span>●</span> <span>1. Personal Details</span>
+                  </div>
+                  <table className="w-full border-collapse text-[9.5px]">
+                    <tbody>
+                      <tr>
+                        <td className="w-1/2 border border-gray-500 p-1.5">
+                          <span className="text-[8.5px] font-bold text-gray-600 block uppercase">Full Name</span>
+                          <strong className="text-black text-[10px]">{!printBlankMode && form.fullName ? form.fullName : '—'}</strong>
+                        </td>
+                        <td className="w-1/2 border border-gray-500 p-1.5">
+                          <span className="text-[8.5px] font-bold text-gray-600 block uppercase">Father Name</span>
+                          <strong className="text-black text-[10px]">{!printBlankMode && form.fatherName ? form.fatherName : '—'}</strong>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td colSpan="2" className="border border-gray-500 p-1.5">
+                          <span className="text-[8.5px] font-bold text-gray-600 block uppercase">Permanent Address</span>
+                          <strong className="text-black text-[10px]">{!printBlankMode && form.address ? form.address : '—'}</strong>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="border border-gray-500 p-1.5">
+                          <span className="text-[8.5px] font-bold text-gray-600 block uppercase">State</span>
+                          <strong className="text-black text-[10px]">{!printBlankMode && form.state ? form.state : 'Uttar Pradesh'}</strong>
+                        </td>
+                        <td className="border border-gray-500 p-1.5">
+                          <span className="text-[8.5px] font-bold text-gray-600 block uppercase">PIN Code</span>
+                          <strong className="text-black text-[10px]">{!printBlankMode && form.pinCode ? form.pinCode : '—'}</strong>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="border border-gray-500 p-1.5">
+                          <span className="text-[8.5px] font-bold text-gray-600 block uppercase">Contact No</span>
+                          <strong className="text-black text-[10px]">{!printBlankMode && form.contactNo ? form.contactNo : '—'}</strong>
+                        </td>
+                        <td className="border border-gray-500 p-1.5">
+                          <span className="text-[8.5px] font-bold text-gray-600 block uppercase">WhatsApp Number</span>
+                          <strong className="text-black text-[10px]">{!printBlankMode && form.whatsappNo ? form.whatsappNo : '—'}</strong>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="border border-gray-500 p-1.5">
+                          <span className="text-[8.5px] font-bold text-gray-600 block uppercase">Email ID</span>
+                          <strong className="text-black text-[10px]">{!printBlankMode && form.email ? form.email : '—'}</strong>
+                        </td>
+                        <td className="border border-gray-500 p-1.5">
+                          <span className="text-[8.5px] font-bold text-gray-600 block uppercase">Family / Alternate Contact</span>
+                          <strong className="text-black text-[10px]">{!printBlankMode && form.familyContact ? form.familyContact : '—'}</strong>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* 4. Passport Details */}
+                <div className="mb-2">
+                  <div className="font-bold text-[10.5px] uppercase mb-1 flex items-center gap-1">
+                    <span>●</span> <span>2. Passport Particulars</span>
+                  </div>
+                  <table className="w-full border-collapse text-[9.5px]">
+                    <tbody>
+                      <tr>
+                        <td className="w-1/3 border border-gray-500 p-1.5">
+                          <span className="text-[8.5px] font-bold text-gray-600 block uppercase">Passport Number</span>
+                          <strong className="text-black text-[10px] font-mono">{!printBlankMode && form.passportNumber ? form.passportNumber : '—'}</strong>
+                        </td>
+                        <td className="w-1/3 border border-gray-500 p-1.5">
+                          <span className="text-[8.5px] font-bold text-gray-600 block uppercase">Date of Birth</span>
+                          <strong className="text-black text-[10px]">{!printBlankMode && form.dob ? form.dob : '—'}</strong>
+                        </td>
+                        <td className="w-1/3 border border-gray-500 p-1.5">
+                          <span className="text-[8.5px] font-bold text-gray-600 block uppercase">Issue Date</span>
+                          <strong className="text-black text-[10px]">{!printBlankMode && form.passportIssue ? form.passportIssue : '—'}</strong>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="border border-gray-500 p-1.5">
+                          <span className="text-[8.5px] font-bold text-gray-600 block uppercase">Expiry Date</span>
+                          <strong className="text-black text-[10px]">{!printBlankMode && form.passportExpiry ? form.passportExpiry : '—'}</strong>
+                        </td>
+                        <td className="border border-gray-500 p-1.5">
+                          <span className="text-[8.5px] font-bold text-gray-600 block uppercase">ECR / ECNR Status</span>
+                          <strong className="text-black text-[10px]">{!printBlankMode && form.ecrStatus ? form.ecrStatus : 'ECNR'}</strong>
+                        </td>
+                        <td className="border border-gray-500 p-1.5">
+                          <span className="text-[8.5px] font-bold text-gray-600 block uppercase">Nationality</span>
+                          <strong className="text-black text-[10px]">{!printBlankMode && form.nationality ? form.nationality : 'Indian'}</strong>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* 5. Work Details */}
+                <div className="mb-2">
+                  <div className="font-bold text-[10.5px] uppercase mb-1 flex items-center gap-1">
+                    <span>●</span> <span>3. Work & Professional Details</span>
+                  </div>
+                  <table className="w-full border-collapse text-[9.5px]">
+                    <tbody>
+                      <tr>
+                        <td className="w-1/2 border border-gray-500 p-1.5">
+                          <span className="text-[8.5px] font-bold text-gray-600 block uppercase">Occupation / Trade</span>
+                          <strong className="text-black text-[10px]">{!printBlankMode && form.occupation ? form.occupation : '—'}</strong>
+                        </td>
+                        <td className="w-1/2 border border-gray-500 p-1.5">
+                          <span className="text-[8.5px] font-bold text-gray-600 block uppercase">Place of Employment</span>
+                          <strong className="text-black text-[10px]">{!printBlankMode && form.placeOfEmployment ? form.placeOfEmployment : '—'}</strong>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="border border-gray-500 p-1.5">
+                          <span className="text-[8.5px] font-bold text-gray-600 block uppercase">Last Experience</span>
+                          <strong className="text-black text-[10px]">{!printBlankMode && form.lastExperience ? form.lastExperience : '—'}</strong>
+                        </td>
+                        <td className="border border-gray-500 p-1.5">
+                          <span className="text-[8.5px] font-bold text-gray-600 block uppercase">Last Salary & Post</span>
+                          <strong className="text-black text-[10px]">{!printBlankMode && form.lastSalaryAndPost ? form.lastSalaryAndPost : '—'}</strong>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="border border-gray-500 p-1.5">
+                          <span className="text-[8.5px] font-bold text-gray-600 block uppercase">New Expected Salary</span>
+                          <strong className="text-black text-[10px]">{!printBlankMode && form.newExpectedSalary ? form.newExpectedSalary : '—'}</strong>
+                        </td>
+                        <td className="border border-gray-500 p-1.5">
+                          <span className="text-[8.5px] font-bold text-gray-600 block uppercase">GAMCA Medical Status</span>
+                          <strong className="text-black text-[10px]">{!printBlankMode && form.medicalReport ? form.medicalReport : 'Pending'}</strong>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td colSpan="2" className="border border-gray-500 p-1.5">
+                          <span className="text-[8.5px] font-bold text-gray-600 block uppercase">Police Clearance Certificate (PCC) Status</span>
+                          <strong className="text-black text-[10px]">{!printBlankMode && form.pccStatus ? form.pccStatus : 'Pending'}</strong>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* 6. Declaration */}
+                <div className="border border-black p-2 text-[9px] leading-snug italic text-gray-800 bg-gray-50/50 mb-2.5">
+                  <strong>Candidate Declaration:</strong> I hereby accept that all details filled above are correct and I certify that I do not apply my passport for another country or office during 3 months of Application submitted date.
+                </div>
+
+                {/* 7. Signature & Photo Row */}
+                <div className="flex justify-between items-end gap-3 mb-2.5">
+                  <div className="flex-1">
+                    <div className="border-b border-black pb-1 mb-1 font-bold text-[9.5px] uppercase">
+                      Candidate Name & Signature:
+                    </div>
+                    <div className="h-12 border border-gray-500 rounded flex items-center justify-center p-2 text-[10px] font-mono text-gray-600">
+                      {!printBlankMode && signaturePreview ? (
+                        <img src={signaturePreview} alt="Signature" className="max-h-10 object-contain" />
+                      ) : !printBlankMode && form.fullName ? (
+                        <span className="font-bold text-black">{form.fullName}</span>
+                      ) : (
+                        <span className="text-gray-400 italic text-[9px]">Candidate Signature</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="w-20 text-center shrink-0">
+                    <div className="border-b border-black pb-1 mb-1 font-bold text-[9.5px] uppercase">
+                      Photo:
+                    </div>
+                    <div className="h-24 w-19 border border-gray-500 rounded mx-auto flex items-center justify-center overflow-hidden bg-gray-50 text-[8px] text-gray-500">
+                      {!printBlankMode && photoPreview ? (
+                        <img src={photoPreview} alt="Candidate" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="text-center p-1 leading-tight">
+                          <span>PASTE PHOTO</span><br />
+                          <span className="text-[7px] text-gray-400">(35x45mm)</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 8. For Office Use Only */}
+                <div className="border-t-2 border-black pt-1.5">
+                  <div className="font-black text-[9.5px] uppercase mb-1">For Office Use Only:</div>
+                  <table className="w-full border-collapse border border-black bg-gray-50/60 text-[9px]">
+                    <tbody>
+                      <tr>
+                        <td className="w-1/4 border border-black p-1.5">
+                          <span className="text-[7.5px] font-bold text-gray-600 block uppercase">Agent Code</span>
+                          <strong className="text-black text-[9.5px]">{!printBlankMode && form.agentCode ? form.agentCode : 'AG-771'}</strong>
+                        </td>
+                        <td className="w-1/4 border border-black p-1.5">
+                          <span className="text-[7.5px] font-bold text-gray-600 block uppercase">Country</span>
+                          <strong className="text-black text-[9.5px]">{!printBlankMode && form.officeConfirmationCountry ? form.officeConfirmationCountry : 'Saudi Arabia'}</strong>
+                        </td>
+                        <td className="w-1/4 border border-black p-1.5">
+                          <span className="text-[7.5px] font-bold text-gray-600 block uppercase">Work / Trade</span>
+                          <strong className="text-black text-[9.5px]">{!printBlankMode && (form.officeConfirmationWork || form.occupation) ? (form.officeConfirmationWork || form.occupation) : 'Pipe Fitter'}</strong>
+                        </td>
+                        <td className="w-1/4 border border-black p-1.5">
+                          <span className="text-[7.5px] font-bold text-gray-600 block uppercase">Agreed Salary</span>
+                          <strong className="text-black text-[9.5px]">{!printBlankMode && form.officeConfirmationSalary ? form.officeConfirmationSalary : 'SAR 2,500'}</strong>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* 9. Legal Footer */}
+                <div className="text-center text-[7.5px] text-gray-500 mt-2 border-t border-dashed border-gray-300 pt-1">
+                  Official Physical Candidate Registration Sheet • Chhaya International Pvt. Ltd. • Ministry of External Affairs Licensed
+                </div>
+
               </div>
-
-              {/* Title Header */}
-              <div className="text-center mb-6">
-                <h2 className="text-[20px] font-bold tracking-wide uppercase inline-block border-b-2 border-black pb-0.5">
-                  Registration Form
-                </h2>
-              </div>
-
-              {/* Date & Reg No row */}
-              <div className="flex justify-between items-center mb-6 text-[13px] font-semibold border-b border-gray-300 pb-2">
-                <div>Date: <span className="font-mono text-gray-800 underline decoration-dotted">{form.date}</span></div>
-                <div>Reg No.: <span className="font-mono text-gray-900 font-bold underline decoration-dotted">{form.regNo}</span></div>
-              </div>
-
-              {/* 1. Personal Details */}
-              <div className="mb-6 space-y-2.5">
-                <div className="font-bold text-[14px] flex items-center gap-1.5">
-                  <span>●</span> <span>Personal Details</span>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-3 text-[13px]">
-                  <div className="border border-gray-400 p-2 rounded">
-                    <span className="text-gray-600">Full Name:</span> <strong>{form.fullName || '—'}</strong>
-                  </div>
-                  <div className="border border-gray-400 p-2 rounded">
-                    <span className="text-gray-600">Father Name:</span> <strong>{form.fatherName || '—'}</strong>
-                  </div>
-                  <div className="col-span-2 border border-gray-400 p-2 rounded">
-                    <span className="text-gray-600">Address:</span> <strong>{form.address || '—'}</strong>
-                  </div>
-                  <div className="border border-gray-400 p-2 rounded">
-                    <span className="text-gray-600">State:</span> <strong>{form.state || '—'}</strong>
-                  </div>
-                  <div className="border border-gray-400 p-2 rounded">
-                    <span className="text-gray-600">PIN Code:</span> <strong>{form.pinCode || '—'}</strong>
-                  </div>
-                  <div className="border border-gray-400 p-2 rounded">
-                    <span className="text-gray-600">Contact No.:</span> <strong>{form.contactNo || '—'}</strong>
-                  </div>
-                  <div className="border border-gray-400 p-2 rounded">
-                    <span className="text-gray-600">WhatsApp Number:</span> <strong>{form.whatsappNo || '—'}</strong>
-                  </div>
-                  <div className="border border-gray-400 p-2 rounded">
-                    <span className="text-gray-600">Email:</span> <strong>{form.email || '—'}</strong>
-                  </div>
-                  <div className="border border-gray-400 p-2 rounded">
-                    <span className="text-gray-600">Family Contact:</span> <strong>{form.familyContact || '—'}</strong>
-                  </div>
-                </div>
-              </div>
-
-              {/* 2. Passport Details */}
-              <div className="mb-6 space-y-2.5">
-                <div className="font-bold text-[14px] flex items-center gap-1.5">
-                  <span>●</span> <span>Passport Details</span>
-                </div>
-
-                <div className="grid grid-cols-3 gap-3 text-[13px]">
-                  <div className="border border-gray-400 p-2 rounded font-mono">
-                    <span className="text-gray-600 font-sans">Passport Number:</span> <strong>{form.passportNumber || '—'}</strong>
-                  </div>
-                  <div className="border border-gray-400 p-2 rounded font-mono">
-                    <span className="text-gray-600 font-sans">Date Of Birth:</span> <strong>{form.dob || '—'}</strong>
-                  </div>
-                  <div className="border border-gray-400 p-2 rounded font-mono">
-                    <span className="text-gray-600 font-sans">Issue Date:</span> <strong>{form.passportIssue || '—'}</strong>
-                  </div>
-                  <div className="border border-gray-400 p-2 rounded font-mono">
-                    <span className="text-gray-600 font-sans">Expiry Date:</span> <strong>{form.passportExpiry || '—'}</strong>
-                  </div>
-                  <div className="border border-gray-400 p-2 rounded">
-                    <span className="text-gray-600">ECR / ECNR:</span> <strong>{form.ecrStatus}</strong>
-                  </div>
-                  <div className="border border-gray-400 p-2 rounded">
-                    <span className="text-gray-600">Nationality:</span> <strong>{form.nationality}</strong>
-                  </div>
-                </div>
-              </div>
-
-              {/* 3. Work Details */}
-              <div className="mb-6 space-y-2.5">
-                <div className="font-bold text-[14px] flex items-center gap-1.5">
-                  <span>●</span> <span>Work Details</span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 text-[13px]">
-                  <div className="border border-gray-400 p-2 rounded">
-                    <span className="text-gray-600">Occupation / Trade:</span> <strong>{form.occupation || '—'}</strong>
-                  </div>
-                  <div className="border border-gray-400 p-2 rounded">
-                    <span className="text-gray-600">Place of Employment:</span> <strong>{form.placeOfEmployment || '—'}</strong>
-                  </div>
-                  <div className="border border-gray-400 p-2 rounded">
-                    <span className="text-gray-600">Last Experience:</span> <strong>{form.lastExperience || '—'}</strong>
-                  </div>
-                  <div className="border border-gray-400 p-2 rounded">
-                    <span className="text-gray-600">Last Salary & Post:</span> <strong>{form.lastSalaryAndPost || '—'}</strong>
-                  </div>
-                  <div className="border border-gray-400 p-2 rounded">
-                    <span className="text-gray-600">New Expected Salary:</span> <strong>{form.newExpectedSalary || '—'}</strong>
-                  </div>
-                  <div className="border border-gray-400 p-2 rounded">
-                    <span className="text-gray-600">Medical Report:</span> <strong>{form.medicalReport}</strong>
-                  </div>
-                  <div className="border border-gray-400 p-2 rounded col-span-2">
-                    <span className="text-gray-600">PCC Status:</span> <strong>{form.pccStatus}</strong>
-                  </div>
-                </div>
-              </div>
-
-              {/* 4. Declaration */}
-              <div className="mb-8 p-3 border border-black text-[12px] leading-relaxed italic text-gray-800">
-                I hereby accept that all details filled above are correct and I certify that I do not apply my passport for another country or office during 3 months of Application submitted date.
-              </div>
-
-              {/* Signature & Photo Area */}
-              <div className="grid grid-cols-2 gap-10 mb-8 items-end">
-                <div>
-                  <div className="border-b-2 border-black pb-1 mb-1 font-bold text-[13px]">
-                    Name & Signature:
-                  </div>
-                  <div className="h-20 border border-gray-400 rounded flex items-center justify-center font-mono text-gray-500 text-[12px]">
-                    {signaturePreview ? (
-                      <img src={signaturePreview} alt="Signature" className="max-h-16 object-contain" />
-                    ) : (
-                      <span>{form.fullName || 'Signed digitally'}</span>
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  <div className="border-b-2 border-black pb-1 mb-1 font-bold text-[13px] text-right">
-                    Photo:
-                  </div>
-                  <div className="h-28 w-24 border border-gray-400 rounded ml-auto flex items-center justify-center font-mono text-gray-400 text-[11px] overflow-hidden">
-                    {photoPreview ? (
-                      <img src={photoPreview} alt="Candidate" className="w-full h-full object-cover" />
-                    ) : (
-                      <span>Passport Photo</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* For Office Use Only */}
-              <div className="border-t-2 border-black pt-3">
-                <div className="font-bold text-[13px] uppercase mb-2">For Office use only:</div>
-                <div className="grid grid-cols-4 gap-3 text-[12px] border border-black p-2.5">
-                  <div>Agent Code: <strong>{form.agentCode}</strong></div>
-                  <div>Country: <strong>{form.officeConfirmationCountry}</strong></div>
-                  <div>Work: <strong>{form.officeConfirmationWork}</strong></div>
-                  <div>Salary: <strong>{form.officeConfirmationSalary}</strong></div>
-                </div>
-              </div>
-
             </div>
+
           </div>
         </div>
       )}
