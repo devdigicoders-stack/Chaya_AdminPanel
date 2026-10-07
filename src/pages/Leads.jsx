@@ -1,32 +1,36 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Users, PhoneCall, Plus, Download, Search, Filter, RefreshCw,
+  Users, PhoneCall, Plus, Search, RefreshCw,
   ShieldCheck, AlertTriangle, CheckCircle2, ChevronRight, Eye,
-  ArrowRight, X, Calendar, Globe, Briefcase, Phone, Mail, MapPin,
+  X, Globe, Phone, MapPin,
   FileSpreadsheet, Share2, Layers, AlertCircle, Sparkles,
   Trash2, Edit, PauseCircle, PlayCircle, History, Clock,
-  MessageCircle, Building2, User
-} from 'lucide-react';
+  MessageCircle, Building2, UserPlus
+  } from 'lucide-react';
 import Swal from 'sweetalert2';
 import {
   apiGetLeads,
   apiGetLeadById,
   apiDeleteLead,
   apiToggleLeadHold,
-  apiUpdateLead
+  apiUpdateLead,
+  apiGetUsers,
+  apiAssignLeadsToStaffHead,
+  apiDistributeStaffHeadRoundRobin,
+  getCurrentUser
 } from '../utils/api';
 import { showToast } from '../utils/alerts';
 import LeadHistoryModal from '../components/leads/LeadHistoryModal';
 
 const STAGE_OPTIONS = [
   { value: 'ALL', label: 'All Workflow Stages' },
-  { value: 'UNASSIGNED', label: 'Unassigned Pool' },
+  { value: 'UNASSIGNED', label: 'Data Controller Intake (Unassigned)' },
+  { value: 'STAFF_HEAD_HANDLING', label: 'Staff Head Handling (Pending Calling)' },
   { value: 'CALLING_SCREENING', label: 'Calling & Screening' },
   { value: 'INITIAL_INTERVIEW', label: 'Technical Interview' },
   { value: 'MEDICAL_PROCESS', label: 'Medical Process' },
   { value: 'ACCOUNTS_COLLECTION', label: 'Payment Booking' },
-  { value: 'STAFF_HEAD_HANDLING', label: 'Staff Head Handling' },
   { value: 'PRE_VISA', label: 'Pre-Viva Verification' },
   { value: 'VISA_PROCESSING', label: 'Visa Processing' },
   { value: 'COMPLETED', label: 'Completed' },
@@ -52,6 +56,7 @@ const SOURCE_OPTIONS = [
 
 export default function Leads() {
   const navigate = useNavigate();
+  const currentUser = getCurrentUser();
 
   // Data & Loading States
   const [leads, setLeads] = useState([]);
@@ -63,6 +68,7 @@ export default function Leads() {
     passportHolders: 0,
     onHold: 0,
     unassigned: 0,
+    staffHeadQueue: 0,
   });
 
   // Filter & Search States
@@ -71,6 +77,14 @@ export default function Leads() {
   const [passportFilter, setPassportFilter] = useState('ALL');
   const [sourceFilter, setSourceFilter] = useState('ALL');
   const [holdFilter, setHoldFilter] = useState('ALL');
+  const [intakeFilter, setIntakeFilter] = useState('ALL'); // 'ALL' | 'UNASSIGNED_INTAKE' | 'STAFF_HEAD_POOL'
+
+  // Selection & Staff Head Transfer States
+  const [selectedLeadIds, setSelectedLeadIds] = useState([]);
+  const [staffHeadModalOpen, setStaffHeadModalOpen] = useState(false);
+  const [staffHeads, setStaffHeads] = useState([]);
+  const [selectedStaffHeadId, setSelectedStaffHeadId] = useState('');
+  const [assigningHead, setAssigningHead] = useState(false);
 
   // Modal States
   const [selectedLead, setSelectedLead] = useState(null);
@@ -78,6 +92,26 @@ export default function Leads() {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editFormData, setEditFormData] = useState({});
   const [savingEdit, setSavingEdit] = useState(false);
+
+  // Load Staff Heads for distribution
+  const loadStaffHeads = useCallback(async () => {
+    try {
+      const res = await apiGetUsers();
+      if (res && res.data) {
+        const heads = res.data.filter(u => u.role === 'STAFF_HEAD' && u.isActive !== false);
+        setStaffHeads(heads);
+        if (heads.length > 0) {
+          setSelectedStaffHeadId(prev => prev || heads[0]._id);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load staff heads', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadStaffHeads();
+  }, [loadStaffHeads]);
 
   // Fetch Leads from Backend
   const fetchLeads = useCallback(async () => {
@@ -90,6 +124,8 @@ export default function Leads() {
         isPassportHolder: passportFilter,
         source: sourceFilter,
         isHold: holdFilter === 'HOLD' ? 'true' : holdFilter === 'ACTIVE' ? 'false' : undefined,
+        unassignedIntake: intakeFilter === 'UNASSIGNED_INTAKE' ? 'true' : undefined,
+        headQueue: intakeFilter === 'STAFF_HEAD_POOL' ? 'true' : undefined,
       });
 
       setLeads(res.data || []);
@@ -101,11 +137,123 @@ export default function Leads() {
     } finally {
       setLoading(false);
     }
-  }, [search, stageFilter, passportFilter, sourceFilter, holdFilter]);
+  }, [search, stageFilter, passportFilter, sourceFilter, holdFilter, intakeFilter]);
 
   useEffect(() => {
     fetchLeads();
   }, [fetchLeads]);
+
+  // Selection Checkbox Handlers
+  const handleSelectAll = (e) => {
+    if (e.target.checked) {
+      setSelectedLeadIds(leads.map(l => l._id));
+    } else {
+      setSelectedLeadIds([]);
+    }
+  };
+
+  const handleSelectOne = (id) => {
+    setSelectedLeadIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectBatch = (count) => {
+    if (!leads.length) return;
+    const num = Math.min(count, leads.length);
+    setSelectedLeadIds(leads.slice(0, num).map(l => l._id));
+  };
+
+  // Staff Head Transfer Logic (Step 01 Flow)
+  const handleAssignToStaffHead = async (targetHeadId) => {
+    const headId = targetHeadId || selectedStaffHeadId;
+    if (!selectedLeadIds.length) {
+      showToast('Please select at least one candidate lead', 'warning');
+      return;
+    }
+    if (!headId) {
+      showToast('Please select a Staff Head', 'warning');
+      return;
+    }
+
+    const headObj = staffHeads.find(h => h._id === headId);
+    const headName = headObj ? headObj.name : 'Selected Staff Head';
+
+    setAssigningHead(true);
+    try {
+      await apiAssignLeadsToStaffHead(selectedLeadIds, headId);
+      Swal.fire({
+        icon: 'success',
+        title: 'Transferred to Head Staff!',
+        html: `<b>${selectedLeadIds.length} candidate(s)</b> have been assigned to Staff Head: <b>${headName}</b>.<br/><br/><span class="text-xs text-gray-500">Staff Head will now allocate them to Calling Staff.</span>`,
+        confirmButtonColor: '#2563EB'
+      });
+      setSelectedLeadIds([]);
+      setStaffHeadModalOpen(false);
+      fetchLeads();
+    } catch (err) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Assignment Failed',
+        text: err.message || 'Could not transfer leads to Staff Head',
+        confirmButtonColor: '#2563EB'
+      });
+    } finally {
+      setAssigningHead(false);
+    }
+  };
+
+  const handleRoundRobinStaffHeads = async () => {
+    if (!selectedLeadIds.length) {
+      showToast('Please select at least one candidate lead', 'warning');
+      return;
+    }
+    if (!staffHeads.length) {
+      showToast('No active Staff Head found in the system', 'warning');
+      return;
+    }
+
+    const confirm = await Swal.fire({
+      title: 'Distribute Round-Robin?',
+      html: `Do you want to distribute <b>${selectedLeadIds.length} candidate(s)</b> equally across all <b>${staffHeads.length} Staff Head(s)</b>?`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, Distribute Equally',
+      confirmButtonColor: '#7C3AED',
+      cancelButtonText: 'Cancel'
+    });
+
+    if (confirm.isConfirmed) {
+      setAssigningHead(true);
+      try {
+        const res = await apiDistributeStaffHeadRoundRobin(selectedLeadIds);
+        Swal.fire({
+          icon: 'success',
+          title: 'Distributed Successfully!',
+          text: res.message || `Distributed ${selectedLeadIds.length} leads across Staff Heads.`,
+          confirmButtonColor: '#2563EB'
+        });
+        setSelectedLeadIds([]);
+        setStaffHeadModalOpen(false);
+        fetchLeads();
+      } catch (err) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Distribution Failed',
+          text: err.message || 'Failed to distribute leads',
+          confirmButtonColor: '#2563EB'
+        });
+      } finally {
+        setAssigningHead(false);
+      }
+    }
+  };
+
+  const handleOpenAssignModalForLead = (lead) => {
+    setSelectedLeadIds([lead._id]);
+    setStaffHeadModalOpen(true);
+    loadStaffHeads();
+  };
 
   // Open History Modal with fresh data from backend
   const handleViewLead = async (leadId) => {
@@ -383,13 +531,56 @@ export default function Leads() {
 
       {/* 2. Dynamic KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
-        <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-xs">
+        <div 
+          onClick={() => { setIntakeFilter('ALL'); setStageFilter('ALL'); }}
+          className={`bg-white rounded-2xl p-4 border shadow-xs cursor-pointer transition-all hover:border-blue-300 ${
+            intakeFilter === 'ALL' && stageFilter === 'ALL' ? 'ring-2 ring-blue-500/20 border-blue-500' : 'border-gray-200/80'
+          }`}
+        >
           <div className="flex items-center justify-between text-gray-500 text-[12px] font-medium mb-1">
             <span>Total In Pool</span>
             <Users className="w-4 h-4 text-blue-600" />
           </div>
           <div className="text-[24px] font-black text-gray-900">{stats.total}</div>
           <div className="text-[11px] text-gray-400 mt-0.5">Central database records</div>
+        </div>
+
+        {/* Data Controller Intake Pool (Waiting for Staff Head) */}
+        <div 
+          onClick={() => {
+            setIntakeFilter(prev => prev === 'UNASSIGNED_INTAKE' ? 'ALL' : 'UNASSIGNED_INTAKE');
+          }}
+          className={`rounded-2xl p-4 border shadow-xs cursor-pointer transition-all ${
+            intakeFilter === 'UNASSIGNED_INTAKE' 
+              ? 'bg-amber-50/80 border-amber-400 ring-2 ring-amber-400/30' 
+              : 'bg-white border-gray-200/80 hover:border-amber-300'
+          }`}
+        >
+          <div className="flex items-center justify-between text-amber-700 text-[12px] font-bold mb-1">
+            <span>Data Controller Intake</span>
+            <Layers className="w-4 h-4 text-amber-600" />
+          </div>
+          <div className="text-[24px] font-black text-amber-600">{stats.unassigned}</div>
+          <div className="text-[11px] text-amber-700/80 font-medium mt-0.5">Needs Staff Head allocation</div>
+        </div>
+
+        {/* Staff Head Queue (Waiting for Calling Staff) */}
+        <div 
+          onClick={() => {
+            setIntakeFilter(prev => prev === 'STAFF_HEAD_POOL' ? 'ALL' : 'STAFF_HEAD_POOL');
+          }}
+          className={`rounded-2xl p-4 border shadow-xs cursor-pointer transition-all ${
+            intakeFilter === 'STAFF_HEAD_POOL' 
+              ? 'bg-purple-50/80 border-purple-400 ring-2 ring-purple-400/30' 
+              : 'bg-white border-gray-200/80 hover:border-purple-300'
+          }`}
+        >
+          <div className="flex items-center justify-between text-purple-700 text-[12px] font-bold mb-1">
+            <span>Staff Head Desk</span>
+            <Sparkles className="w-4 h-4 text-purple-600" />
+          </div>
+          <div className="text-[24px] font-black text-purple-600">{stats.staffHeadQueue || 0}</div>
+          <div className="text-[11px] text-purple-700/80 font-medium mt-0.5">Pending Calling Staff split</div>
         </div>
 
         <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-xs">
@@ -408,24 +599,6 @@ export default function Leads() {
           </div>
           <div className="text-[24px] font-black text-emerald-600">{stats.passportHolders}</div>
           <div className="text-[11px] text-gray-400 mt-0.5">Eligible for interview/CV</div>
-        </div>
-
-        <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-xs">
-          <div className="flex items-center justify-between text-gray-500 text-[12px] font-medium mb-1">
-            <span>Unassigned Pool</span>
-            <Layers className="w-4 h-4 text-amber-600" />
-          </div>
-          <div className="text-[24px] font-black text-amber-600">{stats.unassigned}</div>
-          <div className="text-[11px] text-gray-400 mt-0.5">Awaiting staff assignment</div>
-        </div>
-
-        <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-xs">
-          <div className="flex items-center justify-between text-gray-500 text-[12px] font-medium mb-1">
-            <span>On Hold</span>
-            <PauseCircle className="w-4 h-4 text-rose-600" />
-          </div>
-          <div className="text-[24px] font-black text-rose-600">{stats.onHold}</div>
-          <div className="text-[11px] text-gray-400 mt-0.5">Paused / pending docs</div>
         </div>
       </div>
 
@@ -498,12 +671,38 @@ export default function Leads() {
           <span className="text-gray-400 font-medium">Quick Filter:</span>
           
           <button
-            onClick={() => setHoldFilter('ALL')}
+            onClick={() => { setHoldFilter('ALL'); setIntakeFilter('ALL'); }}
             className={`px-3 py-1 rounded-full text-[11.5px] font-semibold cursor-pointer transition-colors ${
-              holdFilter === 'ALL' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              holdFilter === 'ALL' && intakeFilter === 'ALL' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
             All Active & Hold ({leads.length})
+          </button>
+
+          {/* Step 1 Intake Pill: Data Controller Pool */}
+          <button
+            onClick={() => setIntakeFilter(prev => prev === 'UNASSIGNED_INTAKE' ? 'ALL' : 'UNASSIGNED_INTAKE')}
+            className={`px-3 py-1 rounded-full text-[11.5px] font-bold cursor-pointer transition-all flex items-center gap-1.5 ${
+              intakeFilter === 'UNASSIGNED_INTAKE' 
+                ? 'bg-amber-600 text-white shadow-xs' 
+                : 'bg-amber-50 text-amber-800 border border-amber-300 hover:bg-amber-100'
+            }`}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${intakeFilter === 'UNASSIGNED_INTAKE' ? 'bg-white' : 'bg-amber-500'}`} />
+            <span>Data Controller Intake ({stats.unassigned})</span>
+          </button>
+
+          {/* Step 1 to Step 2: Staff Head Queue */}
+          <button
+            onClick={() => setIntakeFilter(prev => prev === 'STAFF_HEAD_POOL' ? 'ALL' : 'STAFF_HEAD_POOL')}
+            className={`px-3 py-1 rounded-full text-[11.5px] font-bold cursor-pointer transition-all flex items-center gap-1.5 ${
+              intakeFilter === 'STAFF_HEAD_POOL' 
+                ? 'bg-purple-600 text-white shadow-xs' 
+                : 'bg-purple-50 text-purple-800 border border-purple-300 hover:bg-purple-100'
+            }`}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${intakeFilter === 'STAFF_HEAD_POOL' ? 'bg-white' : 'bg-purple-500'}`} />
+            <span>Staff Head Queue ({stats.staffHeadQueue || 0})</span>
           </button>
 
           <button
@@ -524,7 +723,7 @@ export default function Leads() {
             On Hold ({stats.onHold})
           </button>
 
-          {(search || stageFilter !== 'ALL' || passportFilter !== 'ALL' || sourceFilter !== 'ALL' || holdFilter !== 'ALL') && (
+          {(search || stageFilter !== 'ALL' || passportFilter !== 'ALL' || sourceFilter !== 'ALL' || holdFilter !== 'ALL' || intakeFilter !== 'ALL') && (
             <button
               onClick={() => {
                 setSearch('');
@@ -532,12 +731,71 @@ export default function Leads() {
                 setPassportFilter('ALL');
                 setSourceFilter('ALL');
                 setHoldFilter('ALL');
+                setIntakeFilter('ALL');
               }}
               className="ml-auto text-[11.5px] text-blue-600 font-bold hover:underline cursor-pointer flex items-center gap-1"
             >
               <X className="w-3.5 h-3.5" />
               <span>Reset All Filters</span>
             </button>
+          )}
+        </div>
+
+        {/* Batch Selection Toolbar */}
+        <div className="flex items-center justify-between gap-2 pt-2 border-t border-gray-100 flex-wrap text-[12px]">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-gray-400 font-medium">Batch Select:</span>
+            <button
+              onClick={() => handleSelectBatch(10)}
+              className="px-2 py-0.5 rounded-md bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-[11px] cursor-pointer transition-colors"
+            >
+              Top 10
+            </button>
+            <button
+              onClick={() => handleSelectBatch(25)}
+              className="px-2 py-0.5 rounded-md bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-[11px] cursor-pointer transition-colors"
+            >
+              Top 25
+            </button>
+            <button
+              onClick={() => handleSelectBatch(50)}
+              className="px-2 py-0.5 rounded-md bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-[11px] cursor-pointer transition-colors"
+            >
+              Top 50
+            </button>
+            <button
+              onClick={() => {
+                const unassignedIds = leads.filter(l => !l.assignedStaffHead).map(l => l._id);
+                setSelectedLeadIds(unassignedIds);
+              }}
+              className="px-2.5 py-0.5 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 font-bold text-[11px] cursor-pointer transition-colors"
+            >
+              Select All Intake Leads ({leads.filter(l => !l.assignedStaffHead).length})
+            </button>
+          </div>
+
+          {selectedLeadIds.length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
+                {selectedLeadIds.length} Selected
+              </span>
+              <button
+                onClick={() => {
+                  setStaffHeadModalOpen(true);
+                  loadStaffHeads();
+                }}
+                className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-2xs cursor-pointer transition-colors"
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                <span>Forward to Head Staff</span>
+              </button>
+              <button
+                onClick={() => setSelectedLeadIds([])}
+                className="text-[11px] text-gray-500 hover:text-gray-800 font-medium cursor-pointer"
+              >
+                Deselect All
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -599,16 +857,25 @@ export default function Leads() {
         {/* Polished Table with Fixed Column Widths & Zero-Wrap Guarantee */}
         {!loading && leads.length > 0 && (
           <div className="overflow-x-auto custom-scrollbar w-full">
-            <table className="w-full text-left border-collapse min-w-[1220px]">
+            <table className="w-full text-left border-collapse min-w-[1260px]">
               <thead>
                 <tr className="bg-slate-50/95 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider select-none">
+                  <th className="py-3.5 px-3 whitespace-nowrap w-10 text-center">
+                    <input
+                      type="checkbox"
+                      checked={leads.length > 0 && selectedLeadIds.length === leads.length}
+                      onChange={handleSelectAll}
+                      className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 cursor-pointer w-4 h-4"
+                      title="Select all leads"
+                    />
+                  </th>
                   <th className="py-3.5 px-4 whitespace-nowrap min-w-[210px]">Candidate & ID</th>
                   <th className="py-3.5 px-4 whitespace-nowrap min-w-[155px]">Contact & Location</th>
                   <th className="py-3.5 px-4 whitespace-nowrap min-w-[220px]">Trade & Experience</th>
                   <th className="py-3.5 px-4 whitespace-nowrap min-w-[150px]">Passport Verification</th>
                   <th className="py-3.5 px-4 whitespace-nowrap min-w-[130px]">Source</th>
                   <th className="py-3.5 px-4 whitespace-nowrap min-w-[150px]">Workflow Stage</th>
-                  <th className="py-3.5 px-4 whitespace-nowrap min-w-[165px]">Assigned Officer</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap min-w-[190px]">Assigned Officer</th>
                   <th className="py-3.5 px-4 text-right whitespace-nowrap min-w-[120px] sticky right-0 bg-slate-50/95 backdrop-blur-xs z-10 shadow-[-6px_0_8px_-4px_rgba(0,0,0,0.06)]">Actions</th>
                 </tr>
               </thead>
@@ -626,8 +893,18 @@ export default function Leads() {
                   return (
                     <tr
                       key={lead._id}
-                      className={`group hover:bg-blue-50/40 transition-colors ${lead.isHold ? 'bg-amber-50/30' : ''}`}
+                      className={`group hover:bg-blue-50/40 transition-colors ${lead.isHold ? 'bg-amber-50/30' : ''} ${selectedLeadIds.includes(lead._id) ? 'bg-purple-50/40' : ''}`}
                     >
+                      {/* Checkbox */}
+                      <td className="py-3.5 px-3 align-middle text-center whitespace-nowrap">
+                        <input
+                          type="checkbox"
+                          checked={selectedLeadIds.includes(lead._id)}
+                          onChange={() => handleSelectOne(lead._id)}
+                          className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 cursor-pointer w-4 h-4"
+                        />
+                      </td>
+
                       {/* 1. Candidate Avatar & Lead ID */}
                       <td className="py-3.5 px-4 align-middle whitespace-nowrap">
                         <div className="flex items-center gap-3">
@@ -734,14 +1011,27 @@ export default function Leads() {
                               <div className="font-bold text-gray-900 text-[12.5px] leading-tight whitespace-nowrap">
                                 {lead.assignedStaffHead.name}
                               </div>
-                              <div className="text-[10px] text-purple-600 font-semibold mt-0.5 whitespace-nowrap">Staff Head Desk</div>
+                              <div className="text-[10px] text-purple-600 font-semibold mt-0.5 whitespace-nowrap flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                                Staff Head Desk (Pending Calling)
+                              </div>
                             </div>
                           </div>
                         ) : (
-                          <span className="text-[11.5px] text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200 font-semibold whitespace-nowrap inline-flex items-center gap-1.5">
-                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                            Unassigned Pool
-                          </span>
+                          <div className="flex items-center gap-1.5 whitespace-nowrap">
+                            <span className="text-[11px] text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-300 font-bold whitespace-nowrap inline-flex items-center gap-1 shadow-2xs">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                              Data Controller Intake
+                            </span>
+                            <button
+                              onClick={() => handleOpenAssignModalForLead(lead)}
+                              className="px-2 py-0.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-md text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer shadow-2xs active:scale-95"
+                              title="Assign this candidate to Head Staff"
+                            >
+                              <UserPlus className="w-3 h-3 text-purple-600" />
+                              <span>Assign Head</span>
+                            </button>
+                          </div>
                         )}
                       </td>
 
@@ -981,6 +1271,147 @@ export default function Leads() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Bottom Action Bar for Multi-selected Leads */}
+      {selectedLeadIds.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-gray-900/95 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-4 border border-gray-700/80 backdrop-blur-md animate-in slide-in-from-bottom-5">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-sm font-bold">{selectedLeadIds.length} candidate(s) selected</span>
+          </div>
+          <div className="h-4 w-px bg-gray-700" />
+          <button
+            onClick={() => {
+              setStaffHeadModalOpen(true);
+              loadStaffHeads();
+            }}
+            className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg transition-all cursor-pointer active:scale-95"
+          >
+            <UserPlus className="w-4 h-4" />
+            <span>Forward to Head Staff</span>
+          </button>
+          <button
+            onClick={handleRoundRobinStaffHeads}
+            disabled={assigningHead || staffHeads.length === 0}
+            className="px-3.5 py-2 bg-gray-800 hover:bg-gray-700 text-purple-300 rounded-xl text-xs font-bold flex items-center gap-1.5 border border-purple-500/30 transition-all cursor-pointer active:scale-95"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+            <span>Round-Robin Split</span>
+          </button>
+          <button
+            onClick={() => setSelectedLeadIds([])}
+            className="text-gray-400 hover:text-white text-xs font-semibold px-2 py-1 cursor-pointer"
+          >
+            Clear
+          </button>
+        </div>
+      )}
+
+      {/* Staff Head Assignment Modal (Step 01 Flow) */}
+      {staffHeadModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-gray-100 animate-in zoom-in-95">
+            <div className="flex items-center justify-between pb-4 border-b border-gray-100">
+              <div>
+                <div className="flex items-center gap-1.5 text-xs text-purple-600 font-bold mb-0.5">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>STEP 01: DATA CONTROLLER TO HEAD STAFF</span>
+                </div>
+                <h3 className="text-lg font-bold text-gray-900">
+                  Assign {selectedLeadIds.length} Candidate(s) to Head Staff
+                </h3>
+              </div>
+              <button
+                onClick={() => setStaffHeadModalOpen(false)}
+                className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-500 flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-gray-500 mt-3 mb-4 leading-relaxed">
+              Leads from the <b>Data Controller intake pool</b> are assigned directly to <b>Head Staff (Staff Head)</b>. Calling Staff will only receive these candidates after Staff Head distributes them.
+            </p>
+
+            {/* Staff Head Selection Cards */}
+            <div className="space-y-2.5 max-h-64 overflow-y-auto pr-1">
+              {staffHeads.length === 0 ? (
+                <div className="py-8 text-center text-sm text-gray-500 bg-gray-50 rounded-xl">
+                  No active Staff Head users found in the system.
+                </div>
+              ) : (
+                staffHeads.map(head => {
+                  const isSelected = selectedStaffHeadId === head._id;
+                  const initials = (head.name || 'SH')
+                    .split(' ')
+                    .map(n => n[0])
+                    .join('')
+                    .substring(0, 2)
+                    .toUpperCase();
+
+                  return (
+                    <div
+                      key={head._id}
+                      onClick={() => setSelectedStaffHeadId(head._id)}
+                      className={`p-3.5 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
+                        isSelected
+                          ? 'border-purple-600 bg-purple-50/70 ring-2 ring-purple-600/20'
+                          : 'border-gray-200 hover:border-gray-300 bg-white'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-black text-white shadow-2xs ${
+                          isSelected ? 'bg-purple-600' : 'bg-gray-700'
+                        }`}>
+                          {initials}
+                        </div>
+                        <div>
+                          <div className="text-sm font-bold text-gray-900">{head.name}</div>
+                          <div className="text-xs text-gray-500">{head.email}</div>
+                          <div className="text-[10px] text-purple-600 font-semibold mt-0.5">
+                            {head.department || 'Operations Team'}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-purple-100 text-purple-700 border border-purple-200">
+                          Staff Head
+                        </span>
+                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                          isSelected ? 'border-purple-600 bg-purple-600' : 'border-gray-300'
+                        }`}>
+                          {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Action Buttons */}
+            <div className="mt-5 pt-4 border-t border-gray-100 flex flex-col gap-2.5">
+              <button
+                onClick={() => handleAssignToStaffHead(selectedStaffHeadId)}
+                disabled={assigningHead || !selectedStaffHeadId || staffHeads.length === 0}
+                className="w-full py-2.5 px-4 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
+              >
+                {assigningHead ? <RefreshCw className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
+                <span>Confirm Assignment to Selected Staff Head</span>
+              </button>
+
+              <button
+                onClick={handleRoundRobinStaffHeads}
+                disabled={assigningHead || staffHeads.length === 0}
+                className="w-full py-2.5 px-4 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 text-gray-700 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                <span>Distribute Round-Robin Across All ({staffHeads.length}) Staff Heads</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

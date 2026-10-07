@@ -54,7 +54,7 @@ export default function LeadAssignment() {
     setLoading(true);
     try {
       const [leadsRes, usersRes] = await Promise.allSettled([
-        apiGetLeads({ stage: 'UNASSIGNED' }),
+        apiGetLeads({ headQueue: 'true' }),
         apiGetUsers()
       ]);
 

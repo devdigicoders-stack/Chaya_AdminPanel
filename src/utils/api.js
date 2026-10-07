@@ -311,7 +311,23 @@ export const apiTransferLeadStage = async (id, transferData) => {
   });
 };
 
-// 10. Assign leads to calling staff (selective with reassignment support)
+// 09b. Assign leads to Staff Head (Step 01 Flow: Data Controller -> Staff Head)
+export const apiAssignLeadsToStaffHead = async (leadIds, staffHeadId, remarks = '') => {
+  return authFetch('/leads/assign-staff-head', {
+    method: 'POST',
+    body: JSON.stringify({ leadIds, staffHeadId, remarks })
+  });
+};
+
+// 09c. Distribute leads round-robin across Staff Heads (Step 01 Flow: Data Controller -> Staff Heads)
+export const apiDistributeStaffHeadRoundRobin = async (leadIds, staffHeadIds = []) => {
+  return authFetch('/leads/distribute-staff-head-round-robin', {
+    method: 'POST',
+    body: JSON.stringify({ leadIds, staffHeadIds })
+  });
+};
+
+// 10. Assign leads to calling staff (Step 02 Flow: Staff Head -> Calling Staff)
 export const apiAssignLeads = async (leadIds, callingStaffId, confirmReassign = false) => {
   return authFetch('/leads/assign-staff', {
     method: 'POST',
