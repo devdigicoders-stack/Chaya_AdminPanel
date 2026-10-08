@@ -774,12 +774,14 @@ export default function LeadAssignment() {
                       {/* Passport */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         <span className={`px-2.5 py-0.5 rounded-full text-[10.5px] font-bold ${
-                          isPassport ? 'bg-emerald-100 text-emerald-800' :
-                          lead.isPassportHolder === 'NO' ? 'bg-rose-100 text-rose-800' :
-                          'bg-amber-100 text-amber-800'
+                          isPassport ? (lead.isFormFilled ? 'bg-purple-100 text-purple-800' : 'bg-emerald-100 text-emerald-800') :
+                          lead.isPassportHolder === 'NO' ? 'bg-orange-100 text-orange-800' :
+                          lead.isPassportHolder === 'NOT_INTERESTED' ? 'bg-rose-100 text-rose-800' :
+                          'bg-blue-100 text-blue-800'
                         }`}>
-                          {isPassport ? `✓ ${lead.passportNumber || 'Passport Holder'}` :
-                           lead.isPassportHolder === 'NO' ? '✗ No Passport' : '⏳ Pending'}
+                          {isPassport ? (lead.isFormFilled ? '✓ Form Filled' : `✓ ${lead.passportNumber || 'Passport Holder'}`) :
+                           lead.isPassportHolder === 'NO' ? '✗ Non-Passport' :
+                           lead.isPassportHolder === 'NOT_INTERESTED' ? '⊘ Not Interested' : '⏳ Pending Follow-up'}
                         </span>
                       </td>
 

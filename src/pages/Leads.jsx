@@ -39,10 +39,11 @@ const STAGE_OPTIONS = [
 ];
 
 const PASSPORT_OPTIONS = [
-  { value: 'ALL', label: 'All Passport Status' },
-  { value: 'YES', label: 'Passport Holder (Yes)' },
-  { value: 'NO', label: 'Non-Passport (No)' },
-  { value: 'NOT_CONFIRMED', label: 'Not Confirmed' },
+  { value: 'ALL', label: 'All Follow-Up Status' },
+  { value: 'YES', label: 'Passport Holder' },
+  { value: 'NO', label: 'Non-Passport' },
+  { value: 'NOT_INTERESTED', label: 'Not Interested' },
+  { value: 'NOT_CONFIRMED', label: 'Pending Follow-up' },
 ];
 
 const SOURCE_OPTIONS = [
@@ -445,27 +446,46 @@ export default function Leads() {
   };
 
   // Helper: Passport Status Badge
-  const getPassportBadge = (status, passportNumber) => {
+  const getPassportBadge = (status, passportNumber, isFormFilled) => {
     if (status === 'YES') {
       return (
-        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/90 shadow-2xs">
-          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-          <span className="font-mono tracking-tight">{passportNumber ? passportNumber : 'Valid Passport'}</span>
+        <div className="flex flex-col gap-1 items-start">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/90 shadow-2xs">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+            <span className="font-mono tracking-tight">{passportNumber ? passportNumber : 'Passport Holder'}</span>
+          </div>
+          {isFormFilled ? (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+              ✓ Form Filled
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+              ⏳ Form Pending
+            </span>
+          )}
         </div>
       );
     }
     if (status === 'NO') {
       return (
+        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11.5px] font-semibold bg-orange-50 text-orange-700 border border-orange-200/90">
+          <AlertCircle className="w-3.5 h-3.5 text-orange-500 shrink-0" />
+          <span>Non-Passport</span>
+        </div>
+      );
+    }
+    if (status === 'NOT_INTERESTED') {
+      return (
         <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11.5px] font-semibold bg-rose-50 text-rose-700 border border-rose-200/90">
           <AlertCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-          <span>No Passport</span>
+          <span>Not Interested</span>
         </div>
       );
     }
     return (
-      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11.5px] font-semibold bg-amber-50 text-amber-700 border border-amber-200/90">
-        <Clock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-        <span>Not Confirmed</span>
+      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11.5px] font-semibold bg-blue-50 text-blue-700 border border-blue-200/90">
+        <Clock className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+        <span>Pending Follow-up</span>
       </div>
     );
   };
@@ -969,7 +989,7 @@ export default function Leads() {
 
                       {/* 4. Passport Verification */}
                       <td className="py-3.5 px-4 align-middle whitespace-nowrap">
-                        {getPassportBadge(lead.isPassportHolder, lead.passportNumber)}
+                        {getPassportBadge(lead.isPassportHolder, lead.passportNumber, lead.isFormFilled || (lead.applicationForm && Object.keys(lead.applicationForm).length > 0))}
                       </td>
 
                       {/* 5. Source */}
