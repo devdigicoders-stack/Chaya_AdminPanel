@@ -4,7 +4,7 @@ import {
   DollarSign, ArrowDownRight, ArrowUpRight, RefreshCw,
   Volume2, ExternalLink, ShieldCheck, FileCheck2, AlertTriangle, MessageCircle
 } from 'lucide-react';
-import { apiAddBillBookTransaction, apiVerifyBillBookTransaction, apiAddBillBookCharge, apiGetLeadById, getCurrentUser } from '../../utils/api';
+import { apiAddBillBookTransaction, apiVerifyBillBookTransaction, apiRejectBillBookTransaction, apiAddBillBookCharge, apiGetLeadById, getCurrentUser } from '../../utils/api';
 import { showSuccessAlert, showErrorAlert } from '../../utils/alerts';
 
 export default function BillBookModal({ isOpen, onClose, lead, onUpdated }) {
@@ -164,11 +164,11 @@ export default function BillBookModal({ isOpen, onClose, lead, onUpdated }) {
   };
 
   const handleVerify = async (receiptNo) => {
-    if (!confirm(`Verify receipt ${receiptNo}? This confirms money has been cleared by Accounts.`)) return;
+    if (!confirm(`Verify receipt ${receiptNo}? This confirms money has been cleared and credited in bank.`)) return;
     setLoading(true);
     try {
       const res = await apiVerifyBillBookTransaction(localLead._id, receiptNo);
-      showSuccessAlert(`Receipt ${receiptNo} marked as VERIFIED!`);
+      showSuccessAlert(`Receipt ${receiptNo} marked as VERIFIED and credited to ledger!`);
       if (res?.data) {
         setLocalLead(prev => ({ ...prev, billBook: res.data }));
       }
@@ -176,6 +176,25 @@ export default function BillBookModal({ isOpen, onClose, lead, onUpdated }) {
       if (onUpdated) onUpdated();
     } catch (err) {
       showErrorAlert(err.message || 'Failed to verify transaction');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleReject = async (receiptNo) => {
+    const reason = prompt(`Enter reason for rejecting receipt ${receiptNo}:`, 'Payment not credited or receipt invalid');
+    if (!reason) return;
+    setLoading(true);
+    try {
+      const res = await apiRejectBillBookTransaction(localLead._id, receiptNo, reason);
+      showSuccessAlert(`Receipt ${receiptNo} marked as REJECTED.`);
+      if (res?.data) {
+        setLocalLead(prev => ({ ...prev, billBook: res.data }));
+      }
+      await refreshLocalLead();
+      if (onUpdated) onUpdated();
+    } catch (err) {
+      showErrorAlert(err.message || 'Failed to reject transaction');
     } finally {
       setLoading(false);
     }
@@ -461,7 +480,12 @@ export default function BillBookModal({ isOpen, onClose, lead, onUpdated }) {
                           {(tx.status === 'VERIFIED' || tx.verificationStatus === 'VERIFIED') ? (
                             <span className="inline-flex items-center space-x-1 text-emerald-600 font-bold text-[11px]">
                               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                              <span>Verified by Accounts</span>
+                              <span>Verified by Admin</span>
+                            </span>
+                          ) : tx.status === 'REJECTED' ? (
+                            <span className="inline-flex items-center space-x-1 text-rose-600 font-bold text-[11px]" title={tx.rejectionReason || 'Rejected'}>
+                              <X className="w-3.5 h-3.5 text-rose-500" />
+                              <span>Rejected</span>
                             </span>
                           ) : (
                             <span className="inline-flex items-center space-x-1 text-amber-600 font-semibold text-[11px]">
@@ -471,14 +495,25 @@ export default function BillBookModal({ isOpen, onClose, lead, onUpdated }) {
                           )}
                         </td>
                         <td className="py-3 px-4 text-right">
-                          {tx.status !== 'VERIFIED' && tx.verificationStatus !== 'VERIFIED' && isAccountsOrAdmin && (
-                            <button
-                              onClick={() => handleVerify(tx.receiptNo)}
-                              disabled={loading}
-                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-bold shadow-xs transition"
-                            >
-                              Verify Receipt
-                            </button>
+                          {tx.status !== 'VERIFIED' && tx.status !== 'REJECTED' && tx.verificationStatus !== 'VERIFIED' && isAccountsOrAdmin && (
+                            <div className="flex items-center justify-end space-x-1.5">
+                              <button
+                                onClick={() => handleVerify(tx.receiptNo)}
+                                disabled={loading}
+                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-bold shadow-xs transition flex items-center space-x-1 cursor-pointer"
+                              >
+                                <CheckCircle2 className="w-3 h-3" />
+                                <span>Verify</span>
+                              </button>
+                              <button
+                                onClick={() => handleReject(tx.receiptNo)}
+                                disabled={loading}
+                                className="px-2 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded text-[11px] font-bold shadow-xs transition flex items-center space-x-1 cursor-pointer"
+                              >
+                                <X className="w-3 h-3" />
+                                <span>Reject</span>
+                              </button>
+                            </div>
                           )}
                         </td>
                       </tr>

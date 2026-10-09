@@ -643,6 +643,13 @@ export const apiVerifyBillBookTransaction = async (id, receiptNo) => {
   });
 };
 
+export const apiRejectBillBookTransaction = async (id, receiptNo, reason) => {
+  return authFetch(`/leads/${id}/billbook/transaction/${receiptNo}/reject`, {
+    method: 'PUT',
+    body: JSON.stringify({ reason })
+  });
+};
+
 export const apiAddBillBookCharge = async (id, chargeData) => {
   return authFetch(`/leads/${id}/billbook/charge`, {
     method: 'POST',
