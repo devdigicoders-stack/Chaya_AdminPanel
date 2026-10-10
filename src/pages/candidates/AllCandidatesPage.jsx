@@ -526,11 +526,15 @@ export default function AllCandidatesPage() {
                                   {candidate.currentApplicationId || `APP-0${candidate.totalApplicationsCount}`}
                                 </span>
                               )}
-                              {isHold && (
+                              {candidate.closureStatus === 'CLOSED_NO_ADVANCE' ? (
+                                <span className="px-1.5 py-0.2 rounded text-[9.5px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                                  CLOSED (NO ADVANCE)
+                                </span>
+                              ) : isHold ? (
                                 <span className="px-1.5 py-0.2 rounded text-[9.5px] font-bold bg-amber-100 text-amber-800">
                                   HOLD
                                 </span>
-                              )}
+                              ) : null}
                               {candidate.pendingTransfer?.hasPending && (
                                 <span className="px-1.5 py-0.2 rounded text-[9.5px] font-bold bg-amber-500 text-white animate-pulse">
                                   TRANSFER PENDING
@@ -587,13 +591,15 @@ export default function AllCandidatesPage() {
                       {/* Status */}
                       <td className="py-3 px-4 text-center">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10.5px] font-bold ${
-                          candidate.status === 'COMPLETED' || candidate.status === 'PLACED'
+                          candidate.closureStatus === 'CLOSED_NO_ADVANCE'
+                            ? 'bg-amber-50 text-amber-800 border border-amber-300'
+                            : candidate.status === 'COMPLETED' || candidate.status === 'PLACED'
                             ? 'bg-purple-50 text-purple-700 border border-purple-200'
                             : candidate.status === 'CANCELLED' || candidate.status === 'UNFIT'
                             ? 'bg-red-50 text-red-700 border border-red-200'
                             : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                         }`}>
-                          {candidate.status || 'ACTIVE'}
+                          {candidate.closureStatus === 'CLOSED_NO_ADVANCE' ? 'CLOSED (NO ADV)' : (candidate.status || 'ACTIVE')}
                         </span>
                       </td>
 

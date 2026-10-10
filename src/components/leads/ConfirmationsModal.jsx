@@ -489,6 +489,24 @@ export default function ConfirmationsModal({ isOpen, onClose, lead, onUpdated })
               {/* Sub-modal Form with Scrollable Content and Sticky Actions */}
               <form onSubmit={handleSave} className="flex flex-col flex-1 min-h-0 overflow-hidden">
                 <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3.5">
+                  {selectedDoc.docType === 'MEDICAL_FITNESS_DECLARATION' && (
+                    <div className="p-3 bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 rounded-xl text-xs text-indigo-900 dark:text-indigo-200">
+                      <div className="font-bold flex items-center gap-1.5 mb-1.5 text-indigo-700 dark:text-indigo-300">
+                        <span>📦 5-in-1 Medical Confirmation Dossier</span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-[11px] text-slate-700 dark:text-slate-300 font-medium">
+                        <div>• 1. CV / Resume</div>
+                        <div>• 2. Passport Copy & Particulars</div>
+                        <div>• 3. Client Detail Form (Registration)</div>
+                        <div>• 4. Medical Report (Clinical Fitness)</div>
+                        <div className="sm:col-span-2">• 5. Medical Condition Letter & Undertaking</div>
+                      </div>
+                      <div className="mt-2 text-[10.5px] text-indigo-600 dark:text-indigo-400 font-semibold">
+                        Calling Staff explains medical conditions to candidate and preserves mandatory confirmation recording.
+                      </div>
+                    </div>
+                  )}
+
                   <div>
                     <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
                       Confirmation State *

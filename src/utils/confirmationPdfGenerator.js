@@ -169,10 +169,11 @@ export const generateConfirmationPdf = (lead, template, options = { download: tr
     case 'MEDICAL_FITNESS_DECLARATION':
     case 'MEDICAL_CONFIRMATION':
       clauses = [
-        'A. Medical Referral: The candidate has been referred to an authorized/GAMCA accredited clinic for pre-departure medical screening.',
-        'B. Physical & Clinical Fitness: Candidate declares that he/she is free from chronic diseases, communicable conditions, or physical impairments not disclosed during registration.',
-        'C. Repeat Tests: In the event of a "Repeat" or temporary unfitness status, candidate agrees to undergo required re-testing as mandated by clinic protocols.',
-        'D. Financial Ledger: Opening of the medical process opens the financial ledger. Candidate acknowledges that medical examination fee is non-refundable once tests are initiated at the diagnostic facility.'
+        'A. Medical Referral: Candidate referred to GAMCA/authorized diagnostic center for comprehensive overseas medical examination.',
+        'B. 5-in-1 Dossier Attached: The 5 core documents (1. CV / Resume, 2. Passport Copy, 3. Client Detail Registration Form, 4. GAMCA Medical Fitness Report, 5. Medical Condition Letter) have been compiled and officially delivered to candidate.',
+        'C. Clinical Fitness Terms: Candidate certifies freedom from chronic, communicable or disabling medical conditions, and explicitly accepts the clinical fitness undertaking.',
+        'D. Repeat Tests Protocol: In the event of temporary unfitness or repeat requirement, candidate commits to follow prescribed clinical instructions.',
+        'E. Compliance & Call Recording: Calling Staff has explained all medical and placement conditions to candidate, and preserved verified confirmation call audio in central compliance archive.'
       ];
       break;
 

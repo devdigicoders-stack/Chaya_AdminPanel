@@ -96,10 +96,11 @@ export default function VisaLocationConfirmation() {
   const metrics = useMemo(() => {
     const total = leads.length;
     const confirmed = leads.filter(l => l.locationConfirmation?.isConfirmed).length;
-    const pending = leads.filter(l => !l.locationConfirmation?.isConfirmed && (l.locationConfirmation?.editCount || 0) < 4).length;
-    const critical = leads.filter(l => !l.locationConfirmation?.isConfirmed && (l.locationConfirmation?.editCount || 0) >= 3).length;
+    const closedNoAdvance = leads.filter(l => l.closureStatus === 'CLOSED_NO_ADVANCE').length;
+    const pending = leads.filter(l => !l.locationConfirmation?.isConfirmed && (l.locationConfirmation?.editCount || 0) < 4 && l.closureStatus !== 'CLOSED_NO_ADVANCE').length;
+    const critical = leads.filter(l => !l.locationConfirmation?.isConfirmed && (l.locationConfirmation?.editCount || 0) >= 3 && l.closureStatus !== 'CLOSED_NO_ADVANCE').length;
 
-    return { total, confirmed, pending, critical };
+    return { total, confirmed, pending, critical, closedNoAdvance };
   }, [leads]);
 
   // 2. Open Edit Location Modal (FRD Section 13: Max 4 Attempts Rule)
@@ -170,37 +171,61 @@ export default function VisaLocationConfirmation() {
     }
   };
 
-  // 3. Confirm Location & Forward to Pre-Viva (FRD Section 14: Move File)
+  // 3. Confirm Medical & Forward to Advance Collection / Accounts
   const handleConfirmLocation = async (lead) => {
     const loc = lead.locationConfirmation?.confirmedLocation || lead.applicationForm?.preferredCountries?.[0] || 'Saudi Arabia';
+    const existingRec = lead.locationConfirmation?.recordingUrl || lead.closureDetails?.recordingUrl || '';
 
-    const result = await Swal.fire({
-      title: 'Confirm Visa Location?',
-      html: `Confirm overseas job placement destination for <b>${lead.candidateName}</b>?<br><br>
-             <div class="p-3 bg-purple-50 border border-purple-200 rounded-xl text-left text-xs text-purple-900 mb-2">
-               <b>Confirmed Destination:</b> ${loc}<br>
-               <b>File Classification:</b> MOVE FILE (FRD Section 14)<br>
-               <b>Next Step:</b> Step 06 Pre-Viva Verification Desk
-             </div>`,
-      icon: 'question',
+    const { value: formValues } = await Swal.fire({
+      title: 'Confirm Medical & Proceed to Advance',
+      html: `
+        <p class="text-xs text-gray-500 mb-2 text-left">
+          Confirm 5-in-1 Medical Confirmation Dossier & forward <b>${lead.candidateName}</b> to <b>Advance Collection / Accounts Desk</b>.
+        </p>
+        <div class="p-2.5 bg-purple-50 border border-purple-200 rounded-xl text-left text-xs text-purple-900 mb-3 space-y-1">
+          <div><b>Target Country/Location:</b> ${loc}</div>
+          <div><b>Dossier Checklist:</b> 1. CV, 2. Passport, 3. Client Detail Form, 4. Medical Report, 5. Medical Condition Letter</div>
+          <div><b>Next Stage:</b> ACCOUNTS_COLLECTION (Advance Billing)</div>
+        </div>
+        <div class="text-left mb-2">
+          <label class="block text-xs font-bold text-gray-700 mb-1">
+            Medical Confirmation Call Recording URL <span class="text-red-500">* (MANDATORY)</span>
+          </label>
+          <input id="swal-rec-url-conf" class="swal2-input !mt-0 !w-full !text-xs font-mono" placeholder="https://drive.google.com/... or audio URL" value="${existingRec}">
+        </div>
+      `,
+      focusConfirm: false,
       showCancelButton: true,
-      confirmButtonColor: '#7C3AED',
+      confirmButtonColor: '#16A34A',
       cancelButtonColor: '#6B7280',
-      confirmButtonText: 'Yes, Confirm & Move File'
+      confirmButtonText: 'Yes, Confirm & Move to Advance',
+      preConfirm: () => {
+        const rec = document.getElementById('swal-rec-url-conf')?.value || '';
+        if (!rec.trim()) {
+          Swal.showValidationMessage('Call Recording URL is strictly MANDATORY before confirming medical placement!');
+          return false;
+        }
+        return { recordingUrl: rec.trim() };
+      }
     });
 
-    if (!result.isConfirmed) return;
+    if (!formValues) return;
 
+    setActionLoading(true);
     try {
       await apiUpdateLocationConfirmation(lead._id, {
         confirmedLocation: loc,
-        isConfirmed: true
+        isConfirmed: true,
+        outcome: 'PROCEED_ADVANCE',
+        recordingUrl: formValues.recordingUrl,
+        medicalPdfShared: true,
+        medicalConditionsExplained: true
       });
 
       Swal.fire({
         icon: 'success',
-        title: 'Location Confirmed!',
-        html: `File for <b>${lead.candidateName}</b> is now categorized as a <b>Move File</b> and forwarded to <b>Pre-Viva Manager</b>.`,
+        title: 'Medical Confirmed!',
+        html: `File for <b>${lead.candidateName}</b> forwarded to <b>Advance Collection / Accounts</b> with verified recording.`,
         confirmButtonColor: '#2563EB'
       });
 
@@ -212,6 +237,80 @@ export default function VisaLocationConfirmation() {
         text: err.message || 'Could not confirm location.',
         confirmButtonColor: '#EF4444'
       });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // 3b. Client Refuses Advance -> Closed / No Advance (Mandatory Recording)
+  const handleCloseNoAdvance = async (lead) => {
+    const existingRec = lead.locationConfirmation?.recordingUrl || lead.closureDetails?.recordingUrl || '';
+
+    const { value: formValues } = await Swal.fire({
+      title: 'Close as "Closed / No Advance"?',
+      html: `
+        <div class="p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-left text-xs text-amber-900 mb-3 leading-relaxed">
+          <b>📌 User SOP & Compliance Notice:</b><br>
+          Yadi client aage advance nahi deta hai, to uski file Calling Staff ke pass <b>Closed / No Advance</b> status me rahegi aur delete nahi hogi.<br>
+          <b>Es sthiti me bhi medical confirmation call recording aniwarya hai!</b>
+        </div>
+        <div class="text-left mb-2">
+          <label class="block text-xs font-bold text-gray-700 mb-1">
+            Medical Confirmation Call Recording URL <span class="text-red-500">* (MANDATORY)</span>
+          </label>
+          <input id="swal-rec-url-noadv" class="swal2-input !mt-0 !w-full !text-xs font-mono" placeholder="https://drive.google.com/... or audio URL" value="${existingRec}">
+        </div>
+        <div class="text-left">
+          <label class="block text-xs font-bold text-gray-700 mb-1">Reason / Remarks</label>
+          <input id="swal-rem-noadv" class="swal2-input !mt-0 !w-full !text-xs" placeholder="Reason for not paying advance" value="Client declined advance payment after medical examination. File retained under Calling Staff as Closed / No Advance.">
+        </div>
+      `,
+      focusConfirm: false,
+      showCancelButton: true,
+      confirmButtonColor: '#D97706',
+      cancelButtonColor: '#6B7280',
+      confirmButtonText: 'Confirm (Closed / No Advance)',
+      preConfirm: () => {
+        const rec = document.getElementById('swal-rec-url-noadv')?.value || '';
+        const rem = document.getElementById('swal-rem-noadv')?.value || '';
+        if (!rec.trim()) {
+          Swal.showValidationMessage('Call Recording URL is strictly MANDATORY before marking as Closed / No Advance!');
+          return false;
+        }
+        return { recordingUrl: rec.trim(), remarks: rem.trim() };
+      }
+    });
+
+    if (!formValues) return;
+
+    setActionLoading(true);
+    try {
+      await apiUpdateLocationConfirmation(lead._id, {
+        outcome: 'CLOSED_NO_ADVANCE',
+        isNoAdvance: true,
+        recordingUrl: formValues.recordingUrl,
+        remarks: formValues.remarks,
+        medicalPdfShared: true,
+        medicalConditionsExplained: true
+      });
+
+      Swal.fire({
+        icon: 'success',
+        title: 'Closed (No Advance)',
+        text: `Candidate ${lead.candidateName} marked as Closed / No Advance with mandatory recording saved. Retained under Calling Staff.`,
+        confirmButtonColor: '#2563EB'
+      });
+
+      loadData();
+    } catch (err) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Failed to Close File',
+        text: err.message,
+        confirmButtonColor: '#EF4444'
+      });
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -290,10 +389,12 @@ export default function VisaLocationConfirmation() {
     return leads.filter((l) => {
       const edits = l.locationConfirmation?.editCount || 0;
       const isConfirmed = l.locationConfirmation?.isConfirmed;
+      const isClosedNoAdvance = l.closureStatus === 'CLOSED_NO_ADVANCE';
 
+      if (statusFilter === 'CLOSED_NO_ADVANCE' && !isClosedNoAdvance) return false;
       if (statusFilter === 'CONFIRMED' && !isConfirmed) return false;
-      if (statusFilter === 'PENDING' && (isConfirmed || edits >= 4)) return false;
-      if (statusFilter === 'CRITICAL' && (isConfirmed || edits < 3)) return false;
+      if (statusFilter === 'PENDING' && (isConfirmed || edits >= 4 || isClosedNoAdvance)) return false;
+      if (statusFilter === 'CRITICAL' && (isConfirmed || edits < 3 || isClosedNoAdvance)) return false;
 
       return true;
     });
@@ -428,6 +529,7 @@ export default function VisaLocationConfirmation() {
               { id: 'PENDING', label: 'Under Discussion', count: metrics.pending },
               { id: 'CONFIRMED', label: 'Confirmed (Move File)', count: metrics.confirmed },
               { id: 'CRITICAL', label: 'Near 4-Edit Limit', count: metrics.critical },
+              { id: 'CLOSED_NO_ADVANCE', label: 'Closed (No Advance)', count: metrics.closedNoAdvance },
             ].map(tab => (
               <button
                 key={tab.id}
@@ -658,7 +760,25 @@ export default function VisaLocationConfirmation() {
 
                       {/* 6. Status Badge */}
                       <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                        {isConfirmed ? (
+                        {lead.closureStatus === 'CLOSED_NO_ADVANCE' ? (
+                          <div className="inline-flex flex-col items-center gap-1">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-300">
+                              <ShieldAlert className="w-3 h-3 text-amber-600" />
+                              <span>Closed (No Advance)</span>
+                            </span>
+                            {(lead.closureDetails?.recordingUrl || lead.locationConfirmation?.recordingUrl) && (
+                              <a
+                                href={lead.closureDetails?.recordingUrl || lead.locationConfirmation?.recordingUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[10px] text-amber-700 hover:text-amber-900 underline font-semibold flex items-center gap-0.5"
+                                title="Play confirmation recording"
+                              >
+                                <span>Play Recording 🎧</span>
+                              </a>
+                            )}
+                          </div>
+                        ) : isConfirmed ? (
                           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                             <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                             <span>Confirmed (Move File)</span>
@@ -683,7 +803,7 @@ export default function VisaLocationConfirmation() {
                           {/* Edit Location (Attempt #X/4) */}
                           <button
                             onClick={() => handleOpenEditModal(lead)}
-                            disabled={edits >= 4 || isConfirmed}
+                            disabled={edits >= 4 || isConfirmed || lead.closureStatus === 'CLOSED_NO_ADVANCE'}
                             className="px-2.5 py-1.5 bg-purple-50 hover:bg-purple-100 disabled:opacity-40 text-purple-700 border border-purple-200 rounded-xl text-[11.5px] font-bold cursor-pointer transition-colors inline-flex items-center gap-1 shadow-2xs"
                             title="Update Destination Location (Increments edit count)"
                           >
@@ -691,16 +811,28 @@ export default function VisaLocationConfirmation() {
                             <span>Change Loc</span>
                           </button>
 
-                          {/* Confirm & Move to Pre-Viva */}
+                          {/* Confirm & Move to Advance Collection */}
                           <button
                             onClick={() => handleConfirmLocation(lead)}
-                            disabled={isConfirmed}
+                            disabled={isConfirmed || lead.closureStatus === 'CLOSED_NO_ADVANCE'}
                             className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white rounded-xl text-[11.5px] font-bold cursor-pointer transition-all shadow-2xs inline-flex items-center gap-1"
-                            title="Confirm location and forward as Move File to Step 14 Pre-Viva"
+                            title="Confirm 5-in-1 Medical Dossier and forward to Advance Collection / Accounts"
                           >
                             <Check className="w-3 h-3" />
-                            <span>Confirm & Move</span>
+                            <span>Confirm & Advance</span>
                           </button>
+
+                          {/* Client Refuses Advance -> Closed / No Advance */}
+                          {lead.closureStatus !== 'CLOSED_NO_ADVANCE' && !isConfirmed && (
+                            <button
+                              onClick={() => handleCloseNoAdvance(lead)}
+                              className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-xl text-[11.5px] font-bold cursor-pointer transition-colors inline-flex items-center gap-1 shadow-2xs"
+                              title="Client refused advance; retain file with Calling Staff with mandatory recording"
+                            >
+                              <ShieldAlert className="w-3 h-3 text-amber-600" />
+                              <span>No Adv Close</span>
+                            </button>
+                          )}
 
                           {/* Cancel Candidate */}
                           <button

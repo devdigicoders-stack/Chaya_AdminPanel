@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { 
   ChevronRight, DollarSign, Receipt, CheckCircle2, Search, 
-  RefreshCw, Loader2, ArrowRight, Banknote, AlertCircle, 
+  RefreshCw, Loader2, Banknote, AlertCircle, 
   CreditCard, Eye, Printer, X, Check, ShieldCheck, Plane, Download
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
