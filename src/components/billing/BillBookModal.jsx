@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { apiAddBillBookTransaction, apiVerifyBillBookTransaction, apiRejectBillBookTransaction, apiAddBillBookCharge, apiGetLeadById, getCurrentUser } from '../../utils/api';
 import { showSuccessAlert, showErrorAlert } from '../../utils/alerts';
+import Swal from 'sweetalert2';
 
 export default function BillBookModal({ isOpen, onClose, lead, onUpdated }) {
   if (!isOpen || !lead) return null;
@@ -67,7 +68,8 @@ export default function BillBookModal({ isOpen, onClose, lead, onUpdated }) {
   };
 
   const currentUser = getCurrentUser() || {};
-  const isAccountsOrAdmin = ['ADMIN', 'SUPER_ADMIN', 'ACCOUNTS', 'Super Administrator', 'Accounts Manager'].includes(currentUser.role) || currentUser.role?.includes('ADMIN') || currentUser.role?.includes('ACCOUNTS');
+  const userRole = String(currentUser.role || 'ADMIN').toUpperCase();
+  const isAccountsOrAdmin = !currentUser.role || ['ADMIN', 'SUPER_ADMIN', 'ACCOUNTS', 'SUPER ADMINISTRATOR', 'ACCOUNTS MANAGER', 'STAFF_HEAD'].includes(userRole) || userRole.includes('ADMIN') || userRole.includes('ACCOUNT');
 
   const billBook = localLead?.billBook || {
     isLedgerOpen: false,
@@ -163,12 +165,27 @@ export default function BillBookModal({ isOpen, onClose, lead, onUpdated }) {
     }
   };
 
-  const handleVerify = async (receiptNo) => {
-    if (!confirm(`Verify receipt ${receiptNo}? This confirms money has been cleared and credited in bank.`)) return;
+  const handleVerify = async (receiptNo, txAmount = 0) => {
+    const result = await Swal.fire({
+      title: 'Verify Payment Receipt?',
+      html: `<div class="text-left text-sm text-gray-600">
+        <p class="mb-2">Receipt No: <strong class="text-blue-600">${receiptNo}</strong></p>
+        ${txAmount ? `<p class="mb-2">Amount: <strong class="text-emerald-600">₹${Number(txAmount).toLocaleString('en-IN')}</strong></p>` : ''}
+        <p class="text-xs text-gray-500 mt-2">By verifying, this payment will be formally credited to the candidate's ledger, deducted from balance due, and recorded in the audit trail.</p>
+      </div>`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#059669',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Yes, Verify & Credit',
+      cancelButtonText: 'Cancel'
+    });
+    if (!result.isConfirmed) return;
+
     setLoading(true);
     try {
       const res = await apiVerifyBillBookTransaction(localLead._id, receiptNo);
-      showSuccessAlert(`Receipt ${receiptNo} marked as VERIFIED and credited to ledger!`);
+      showSuccessAlert(`Receipt ${receiptNo} verified successfully and credited to ledger!`);
       if (res?.data) {
         setLocalLead(prev => ({ ...prev, billBook: res.data }));
       }
@@ -182,8 +199,27 @@ export default function BillBookModal({ isOpen, onClose, lead, onUpdated }) {
   };
 
   const handleReject = async (receiptNo) => {
-    const reason = prompt(`Enter reason for rejecting receipt ${receiptNo}:`, 'Payment not credited or receipt invalid');
-    if (!reason) return;
+    const result = await Swal.fire({
+      title: 'Reject Payment Receipt',
+      text: `Enter the reason for rejecting receipt ${receiptNo}:`,
+      input: 'text',
+      inputValue: 'Payment not credited or receipt invalid',
+      inputPlaceholder: 'Reason for rejection...',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#dc2626',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Reject Payment',
+      cancelButtonText: 'Cancel',
+      inputValidator: (value) => {
+        if (!value || !value.trim()) {
+          return 'Please provide a valid reason for rejection!';
+        }
+      }
+    });
+    if (!result.isConfirmed) return;
+    const reason = result.value.trim();
+
     setLoading(true);
     try {
       const res = await apiRejectBillBookTransaction(localLead._id, receiptNo, reason);
@@ -498,7 +534,7 @@ export default function BillBookModal({ isOpen, onClose, lead, onUpdated }) {
                           {tx.status !== 'VERIFIED' && tx.status !== 'REJECTED' && tx.verificationStatus !== 'VERIFIED' && isAccountsOrAdmin && (
                             <div className="flex items-center justify-end space-x-1.5">
                               <button
-                                onClick={() => handleVerify(tx.receiptNo)}
+                                onClick={() => handleVerify(tx.receiptNo, tx.amount)}
                                 disabled={loading}
                                 className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-bold shadow-xs transition flex items-center space-x-1 cursor-pointer"
                               >

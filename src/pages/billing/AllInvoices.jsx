@@ -56,7 +56,8 @@ export default function AllInvoices() {
           ['MEDICAL_PROCESS', 'ACCOUNTS_COLLECTION', 'STAFF_HEAD_HANDLING', 'PRE_VISA', 'VISA_PROCESSING', 'VIVA_PLACEMENT', 'COMPLETED'].includes(l.currentStage) ||
           (l.paymentDetails?.totalPaid && l.paymentDetails.totalPaid > 0) ||
           (l.paymentDetails?.advancePaid && l.paymentDetails.advancePaid > 0) ||
-          (l.paymentDetails?.servicePaid && l.paymentDetails.servicePaid > 0)
+          (l.paymentDetails?.servicePaid && l.paymentDetails.servicePaid > 0) ||
+          (l.billBook?.transactions && l.billBook.transactions.length > 0)
         );
         setLeads(billingCandidates);
       }
@@ -276,6 +277,9 @@ export default function AllInvoices() {
     let settledCount = 0;
     let partialCount = 0;
     let openCount = 0;
+    let pendingVerifCount = 0;
+    let pendingVerifAmount = 0;
+    let pendingVerifLeadsCount = 0;
 
     leads.forEach(l => {
       const p = l.paymentDetails || {};
@@ -284,6 +288,15 @@ export default function AllInvoices() {
       const billed = sFee + mFee;
       const paid = Number(p.totalPaid || p.advancePaid || (p.servicePaid || 0) + (p.medicalPaid || 0));
       const bal = Math.max(0, billed - paid);
+
+      const pendingTxs = (l.billBook?.transactions || []).filter(tx => 
+        tx.status === 'PENDING_VERIFICATION' || (!tx.status && tx.verificationStatus !== 'VERIFIED' && tx.status !== 'REJECTED')
+      );
+      if (pendingTxs.length > 0) {
+        pendingVerifLeadsCount++;
+        pendingVerifCount += pendingTxs.length;
+        pendingVerifAmount += pendingTxs.reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+      }
 
       totalInvoiced += billed;
       totalPaid += paid;
@@ -294,7 +307,7 @@ export default function AllInvoices() {
       else openCount++;
     });
 
-    return { totalInvoiced, totalPaid, totalBalance, settledCount, partialCount, openCount };
+    return { totalInvoiced, totalPaid, totalBalance, settledCount, partialCount, openCount, pendingVerifCount, pendingVerifAmount, pendingVerifLeadsCount };
   }, [leads]);
 
   // Filtered Leads
@@ -308,7 +321,16 @@ export default function AllInvoices() {
       const balance = Math.max(0, totalBilled - totalPaid);
       const status = balance === 0 && totalPaid > 0 ? 'Settled' : totalPaid > 0 ? 'Partially Paid' : 'Open';
 
-      if (statusFilter !== 'ALL' && status !== statusFilter) return false;
+      const pendingTxs = (l.billBook?.transactions || []).filter(tx => 
+        tx.status === 'PENDING_VERIFICATION' || (!tx.status && tx.verificationStatus !== 'VERIFIED' && tx.status !== 'REJECTED')
+      );
+      const hasPendingVerif = pendingTxs.length > 0;
+
+      if (statusFilter === 'PENDING_VERIF') {
+        if (!hasPendingVerif) return false;
+      } else if (statusFilter !== 'ALL' && status !== statusFilter) {
+        return false;
+      }
 
       if (searchTerm.trim()) {
         const q = searchTerm.toLowerCase();
@@ -461,6 +483,39 @@ export default function AllInvoices() {
 
       </div>
 
+      {/* Pending Verification Notice Banner */}
+      {metrics.pendingVerifCount > 0 && (
+        <div className="mb-4 p-4 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300 text-amber-900 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in duration-200">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <Clock className="w-5 h-5 animate-pulse" />
+            </div>
+            <div>
+              <div className="text-sm font-bold flex items-center gap-2">
+                <span>{metrics.pendingVerifCount} Payment Transaction(s) Awaiting Admin Verification</span>
+                <span className="px-2 py-0.5 rounded-full text-[11px] bg-amber-200 text-amber-900 font-mono font-extrabold">
+                  ₹{metrics.pendingVerifAmount.toLocaleString('en-IN')} Total
+                </span>
+              </div>
+              <div className="text-xs text-amber-700 mt-0.5">
+                Staff entered payments via mobile app. Verify them to officially deduct from candidate balances and credit company ledger.
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={() => setStatusFilter('PENDING_VERIF')}
+            className={`px-3.5 py-2 text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer whitespace-nowrap shrink-0 flex items-center gap-1.5 ${
+              statusFilter === 'PENDING_VERIF'
+                ? 'bg-amber-700 text-white ring-2 ring-amber-400'
+                : 'bg-amber-600 hover:bg-amber-700 text-white'
+            }`}
+          >
+            <Clock className="w-3.5 h-3.5" />
+            <span>Filter Pending ({metrics.pendingVerifCount})</span>
+          </button>
+        </div>
+      )}
+
       {/* 3. Filter Tabs & Search */}
       <div className="bg-white p-3.5 rounded-2xl border border-gray-200/80 shadow-xs mb-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -468,6 +523,12 @@ export default function AllInvoices() {
           <div className="flex items-center gap-1.5 bg-gray-50/80 p-1 rounded-xl border border-gray-200/60 overflow-x-auto">
             {[
               { key: 'ALL', label: 'All Bill Books', count: leads.length },
+              ...(metrics.pendingVerifCount > 0 ? [{ 
+                key: 'PENDING_VERIF', 
+                label: '⚠️ Pending Verification', 
+                count: metrics.pendingVerifLeadsCount,
+                highlight: true
+              }] : []),
               { key: 'Open', label: 'Open (No Payment)', count: metrics.openCount },
               { key: 'Partially Paid', label: 'Partially Paid', count: metrics.partialCount },
               { key: 'Settled', label: 'Settled', count: metrics.settledCount },
@@ -477,13 +538,19 @@ export default function AllInvoices() {
                 onClick={() => setStatusFilter(tab.key)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
                   statusFilter === tab.key
-                    ? 'bg-white text-gray-900 shadow-2xs font-bold'
-                    : 'text-gray-500 hover:text-gray-800'
+                    ? tab.highlight 
+                      ? 'bg-amber-500 text-white shadow-2xs font-bold' 
+                      : 'bg-white text-gray-900 shadow-2xs font-bold'
+                    : tab.highlight
+                      ? 'text-amber-700 bg-amber-50 hover:bg-amber-100 font-bold'
+                      : 'text-gray-500 hover:text-gray-800'
                 }`}
               >
                 <span>{tab.label}</span>
                 <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                  statusFilter === tab.key ? 'bg-blue-50 text-blue-600' : 'bg-gray-200/80 text-gray-600'
+                  statusFilter === tab.key 
+                    ? tab.highlight ? 'bg-amber-700 text-white' : 'bg-blue-50 text-blue-600' 
+                    : tab.highlight ? 'bg-amber-200 text-amber-900' : 'bg-gray-200/80 text-gray-600'
                 }`}>
                   {tab.count}
                 </span>
@@ -549,8 +616,13 @@ export default function AllInvoices() {
                   const status = balance === 0 && totalPaid > 0 ? 'Settled' : totalPaid > 0 ? 'Partially Paid' : 'Open';
                   const receiptNo = p.receiptNo || `BB-${lead._id.substring(lead._id.length - 4).toUpperCase()}`;
 
+                  const pendingTxs = (lead.billBook?.transactions || []).filter(tx => 
+                    tx.status === 'PENDING_VERIFICATION' || (!tx.status && tx.verificationStatus !== 'VERIFIED' && tx.status !== 'REJECTED')
+                  );
+                  const pendingAmt = pendingTxs.reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+
                   return (
-                    <tr key={lead._id} className="hover:bg-blue-50/30 transition-colors">
+                    <tr key={lead._id} className={`hover:bg-blue-50/30 transition-colors ${pendingTxs.length > 0 ? 'bg-amber-50/40' : ''}`}>
                       
                       {/* Invoice No */}
                       <td className="py-3 px-4 font-mono">
@@ -566,6 +638,18 @@ export default function AllInvoices() {
                         <div className="text-[11px] text-gray-400 font-mono">
                           {lead.passportNumber || 'No Passport'} • {lead.phone || 'No Phone'}
                         </div>
+                        {pendingTxs.length > 0 && (
+                          <div className="mt-1">
+                            <span 
+                              onClick={() => setBillBookLead(lead)}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 hover:bg-amber-200 text-amber-800 border border-amber-300 cursor-pointer shadow-2xs transition-colors"
+                              title="Click to open ledger & verify payment"
+                            >
+                              <Clock className="w-2.5 h-2.5 text-amber-600 animate-spin" />
+                              <span>{pendingTxs.length} Pending Verif. (₹{pendingAmt.toLocaleString('en-IN')})</span>
+                            </span>
+                          </div>
+                        )}
                       </td>
 
                       {/* Trade & Country */}
@@ -653,11 +737,15 @@ export default function AllInvoices() {
                           {/* Official Bill Book Ledger & Verification */}
                           <button
                             onClick={() => setBillBookLead(lead)}
-                            className="h-7 px-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer shadow-xs"
-                            title="Official Bill Book Ledger & Receipt Verification"
+                            className={`h-7 px-2.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer shadow-xs ${
+                              pendingTxs.length > 0
+                                ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-amber-200 ring-2 ring-amber-300 animate-pulse'
+                                : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200'
+                            }`}
+                            title={pendingTxs.length > 0 ? "Review & Verify Pending Payments" : "Official Bill Book Ledger & Receipt Verification"}
                           >
-                            <Receipt className="w-3.5 h-3.5 text-emerald-600" />
-                            <span>Ledger</span>
+                            <Receipt className={`w-3.5 h-3.5 ${pendingTxs.length > 0 ? 'text-white' : 'text-emerald-600'}`} />
+                            <span>{pendingTxs.length > 0 ? 'Verify Pay' : 'Ledger'}</span>
                           </button>
 
                           {/* Quick Print Invoice Receipt */}

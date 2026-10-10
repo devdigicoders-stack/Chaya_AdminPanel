@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import { apiGetLeads, apiRecordFinalPayment } from '../../utils/api';
 import { generateInvoicePdf, printInvoiceReceipt } from '../../utils/invoicePdfGenerator';
+import BillBookModal from '../../components/billing/BillBookModal';
 
 export default function FinalPayments() {
   const navigate = useNavigate();
@@ -25,6 +26,7 @@ export default function FinalPayments() {
   // Modals
   const [payModal, setPayModal] = useState(null);
   const [viewReceiptModal, setViewReceiptModal] = useState(null);
+  const [billBookCandidate, setBillBookCandidate] = useState(null);
   const [formValues, setFormValues] = useState({
     amount: '',
     paymentMode: 'Bank Transfer',
@@ -434,6 +436,20 @@ export default function FinalPayments() {
                             </button>
                           )}
 
+                          {/* Official Bill Book Ledger & Verification */}
+                          <button
+                            onClick={() => setBillBookCandidate(candidate)}
+                            className={`h-7 px-2 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer shadow-xs ${
+                              (candidate.billBook?.transactions || []).some(t => t.status === 'PENDING_VERIFICATION')
+                                ? 'bg-amber-500 hover:bg-amber-600 text-white ring-2 ring-amber-300 animate-pulse'
+                                : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200'
+                            }`}
+                            title="Official Bill Book & Receipt Verification"
+                          >
+                            <Receipt className={`w-3.5 h-3.5 ${(candidate.billBook?.transactions || []).some(t => t.status === 'PENDING_VERIFICATION') ? 'text-white' : 'text-emerald-600'}`} />
+                            <span>{(candidate.billBook?.transactions || []).some(t => t.status === 'PENDING_VERIFICATION') ? 'Verify' : 'Ledger'}</span>
+                          </button>
+
                           {/* Quick Print Receipt */}
                           <button
                             type="button"
@@ -682,6 +698,14 @@ export default function FinalPayments() {
           </div>
         </div>
       )}
+
+      {/* Bill Book & Financial Ledger Modal */}
+      <BillBookModal
+        isOpen={Boolean(billBookCandidate)}
+        onClose={() => setBillBookCandidate(null)}
+        lead={billBookCandidate}
+        onUpdated={fetchFinalPaymentQueue}
+      />
 
     </div>
   );
