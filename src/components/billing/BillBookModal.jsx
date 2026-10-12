@@ -97,10 +97,55 @@ export default function BillBookModal({ isOpen, onClose, lead, onUpdated }) {
   const [paymentMethod, setPaymentMethod] = useState('UPI');
   const [referenceNo, setReferenceNo] = useState('');
   const [txRemarks, setTxRemarks] = useState('');
+  const [recordingUrl, setRecordingUrl] = useState('');
+  const [advanceConditionsExplained, setAdvanceConditionsExplained] = useState(true);
+  const [processConditionsExplained, setProcessConditionsExplained] = useState(true);
 
   // New Charge Form State
   const [chargeDesc, setChargeDesc] = useState('');
   const [chargeAmount, setChargeAmount] = useState('');
+
+  const handleShareAdvanceConfirmationWhatsApp = (tx) => {
+    if (!localLead) return;
+    const phone = localLead.phone || localLead.applicationForm?.phone || '';
+    let digits = String(phone).replace(/\D/g, '');
+    if (digits.length === 10) digits = '91' + digits;
+
+    if (!digits) {
+      showErrorAlert('Missing Phone', 'Candidate phone number is not available for WhatsApp');
+      return;
+    }
+
+    const cName = localLead.candidateName || localLead.name || 'Candidate';
+    const passport = localLead.passportNumber || 'N/A';
+    const trade = localLead.trade || 'General Worker';
+    const company = localLead.companyConfirmation?.companyName || 'Overseas Employer';
+    const amt = tx ? tx.amount : (parseFloat(txAmount) || localLead.billBook?.totalReceived || 0);
+    const mode = tx ? (tx.paymentMode || tx.paymentMethod) : paymentMethod;
+    const rNo = tx ? tx.receiptNo : (referenceNo || 'ADV-BOOKING');
+    const bal = localLead.billBook?.balanceDue !== undefined ? localLead.billBook.balanceDue : 'N/A';
+
+    const text = `*CHHAYA INTERNATIONAL PVT LTD*\n*STEP 8: AFTER ADVANCE CONFIRMATION DOSSIER*\n` +
+      `----------------------------------------\n` +
+      `Dear *${cName}*,\n\n` +
+      `Your advance booking amount of *₹${Number(amt).toLocaleString('en-IN')}* has been officially received and credited to your Bill Book ledger.\n\n` +
+      `📋 *Payment & Booking Ledger:*\n` +
+      `• Receipt No: ${rNo}\n` +
+      `• Payment Mode: ${mode}\n` +
+      `• Candidate Passport: ${passport}\n` +
+      `• Selected Company: ${company}\n` +
+      `• Position/Trade: ${trade}\n` +
+      `• Remaining Balance Due: ₹${typeof bal === 'number' ? bal.toLocaleString('en-IN') : bal}\n\n` +
+      `✅ *Confirmed Process Terms:*\n` +
+      `1. Advance payment condition and service milestones explained.\n` +
+      `2. Overseas recruitment & visa processing terms accepted.\n` +
+      `3. Voice confirmation recording verified and archived.\n\n` +
+      `Your file is now forwarded to *Step 9: Staff Head Handling* for document verification.\n\n` +
+      `Best Regards,\nChhaya International Pvt Ltd`;
+
+    const waUrl = `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
+    window.open(waUrl, '_blank');
+  };
 
   const handleAddTransaction = async (e) => {
     e.preventDefault();
@@ -108,6 +153,25 @@ export default function BillBookModal({ isOpen, onClose, lead, onUpdated }) {
       showErrorAlert('Please enter a valid amount');
       return;
     }
+
+    // Step 8 Gates when collecting Advance
+    if (txType === 'ADVANCE') {
+      const isAccepted = localLead.companyConfirmation?.status === 'AGREEMENT_ACCEPTED' || 
+                         localLead.companyConfirmation?.clientAccepted === true;
+      if (!isAccepted) {
+        showErrorAlert('Proposal Acceptance Required (Step 7)', 'Client dwara Step 7: Proposal / Agreement swikar (Accepted) kiye jane ke baad hi advance payment liya ja sakta hai! Uske pehle advance lena prohibited hai.');
+        return;
+      }
+      if (!recordingUrl.trim()) {
+        showErrorAlert('Call Recording Mandatory', 'Advance payment evam process conditions confirmation call recording audio URL is strictly required.');
+        return;
+      }
+      if (!advanceConditionsExplained || !processConditionsExplained) {
+        showErrorAlert('Conditions Required', 'Please confirm that advance payment and process conditions have been explained clearly to the client.');
+        return;
+      }
+    }
+
     setLoading(true);
     try {
       const res = await apiAddBillBookTransaction(localLead._id, {
@@ -117,13 +181,18 @@ export default function BillBookModal({ isOpen, onClose, lead, onUpdated }) {
         paymentMode: paymentMethod,
         paymentMethod: paymentMethod,
         referenceNo,
-        remarks: txRemarks
+        remarks: txRemarks,
+        recordingUrl: txType === 'ADVANCE' ? recordingUrl.trim() : undefined,
+        advanceConditionsExplained: txType === 'ADVANCE' ? advanceConditionsExplained : undefined,
+        processConditionsExplained: txType === 'ADVANCE' ? processConditionsExplained : undefined,
+        afterAdvanceConfirmed: txType === 'ADVANCE' ? true : undefined
       });
       showSuccessAlert('Payment transaction recorded successfully in Bill Book!');
       setShowAddTxModal(false);
       setTxAmount('');
       setReferenceNo('');
       setTxRemarks('');
+      setRecordingUrl('');
       if (res?.data) {
         setLocalLead(prev => ({ ...prev, billBook: res.data }));
       }
@@ -531,26 +600,38 @@ export default function BillBookModal({ isOpen, onClose, lead, onUpdated }) {
                           )}
                         </td>
                         <td className="py-3 px-4 text-right">
-                          {tx.status !== 'VERIFIED' && tx.status !== 'REJECTED' && tx.verificationStatus !== 'VERIFIED' && isAccountsOrAdmin && (
-                            <div className="flex items-center justify-end space-x-1.5">
+                          <div className="flex items-center justify-end space-x-1.5">
+                            {(tx.type === 'ADVANCE' || tx.head === 'ADVANCE') && (
                               <button
-                                onClick={() => handleVerify(tx.receiptNo, tx.amount)}
-                                disabled={loading}
-                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-bold shadow-xs transition flex items-center space-x-1 cursor-pointer"
+                                type="button"
+                                onClick={() => handleShareAdvanceConfirmationWhatsApp(tx)}
+                                className="p-1 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded cursor-pointer"
+                                title="Share Step 8 Confirmation Dossier on WhatsApp"
                               >
-                                <CheckCircle2 className="w-3 h-3" />
-                                <span>Verify</span>
+                                <MessageCircle className="w-3.5 h-3.5" />
                               </button>
-                              <button
-                                onClick={() => handleReject(tx.receiptNo)}
-                                disabled={loading}
-                                className="px-2 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded text-[11px] font-bold shadow-xs transition flex items-center space-x-1 cursor-pointer"
-                              >
-                                <X className="w-3 h-3" />
-                                <span>Reject</span>
-                              </button>
-                            </div>
-                          )}
+                            )}
+                            {tx.status !== 'VERIFIED' && tx.status !== 'REJECTED' && tx.verificationStatus !== 'VERIFIED' && isAccountsOrAdmin && (
+                              <>
+                                <button
+                                  onClick={() => handleVerify(tx.receiptNo, tx.amount)}
+                                  disabled={loading}
+                                  className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-bold shadow-xs transition flex items-center space-x-1 cursor-pointer"
+                                >
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  <span>Verify</span>
+                                </button>
+                                <button
+                                  onClick={() => handleReject(tx.receiptNo)}
+                                  disabled={loading}
+                                  className="px-2 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded text-[11px] font-bold shadow-xs transition flex items-center space-x-1 cursor-pointer"
+                                >
+                                  <X className="w-3 h-3" />
+                                  <span>Reject</span>
+                                </button>
+                              </>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -638,7 +719,7 @@ export default function BillBookModal({ isOpen, onClose, lead, onUpdated }) {
                     onChange={e => setTxType(e.target.value)}
                     className="w-full text-xs px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
                   >
-                    <option value="ADVANCE">Advance Payment (Step 9)</option>
+                    <option value="ADVANCE">Advance Payment (Step 8 / 9)</option>
                     <option value="STAGE_PAYMENT">Stage Progress Payment</option>
                     <option value="FINAL">Final Settlement (Step 14)</option>
                     <option value="MEDICAL">Medical Center Fee</option>
@@ -646,6 +727,85 @@ export default function BillBookModal({ isOpen, onClose, lead, onUpdated }) {
                     <option value="REFUND">Refund Disbursement</option>
                   </select>
                 </div>
+
+                {/* Step 7 Proposal Acceptance Gate for Step 8 Advance */}
+                {txType === 'ADVANCE' && (() => {
+                  const isAccepted = localLead?.companyConfirmation?.status === 'AGREEMENT_ACCEPTED' || 
+                                     localLead?.companyConfirmation?.clientAccepted === true;
+                  return (
+                    <div className="p-3 rounded-xl border border-purple-200 dark:border-purple-800 bg-purple-50/50 dark:bg-purple-950/20 space-y-2.5">
+                      <div className={`p-2 rounded-lg border text-xs flex items-center justify-between ${
+                        isAccepted 
+                          ? 'bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-300' 
+                          : 'bg-rose-50 border-rose-200 text-rose-800 dark:bg-rose-950/30 dark:border-rose-800 dark:text-rose-300'
+                      }`}>
+                        <div className="flex items-center gap-1.5 font-bold">
+                          {isAccepted ? <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" /> : <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />}
+                          <span>{isAccepted ? 'Step 7: Proposal Accepted' : 'Step 7: Proposal Acceptance Required'}</span>
+                        </div>
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase bg-white/80 dark:bg-black/30">
+                          {isAccepted ? 'Unlocked' : 'Blocked'}
+                        </span>
+                      </div>
+
+                      {!isAccepted && (
+                        <p className="text-[10.5px] text-rose-600 dark:text-rose-400 leading-snug">
+                          * Client dwara proposal/agreement swikar hone ke baad hi advance amount liya ja sakta hai, uske pehle advance lena strictly prohibited hai.
+                        </p>
+                      )}
+
+                      <div className="space-y-1.5">
+                        <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={advanceConditionsExplained}
+                            onChange={e => setAdvanceConditionsExplained(e.target.checked)}
+                            className="h-3.5 w-3.5 rounded text-purple-600"
+                          />
+                          <span>Advance payment terms & milestones explained</span>
+                        </label>
+                        <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={processConditionsExplained}
+                            onChange={e => setProcessConditionsExplained(e.target.checked)}
+                            className="h-3.5 w-3.5 rounded text-purple-600"
+                          />
+                          <span>Overseas visa & recruitment process conditions explained</span>
+                        </label>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
+                          <span className="flex items-center gap-1">
+                            <Volume2 className="w-3.5 h-3.5 text-purple-600" />
+                            <span>Confirmation Call Recording Audio URL *</span>
+                          </span>
+                        </label>
+                        <input
+                          type="url"
+                          required={txType === 'ADVANCE'}
+                          placeholder="Drive link or audio recording URL..."
+                          value={recordingUrl}
+                          onChange={e => setRecordingUrl(e.target.value)}
+                          className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white font-mono"
+                        />
+                      </div>
+
+                      <div className="pt-2 border-t border-purple-200 dark:border-purple-800 flex items-center justify-between">
+                        <span className="text-[11px] text-slate-500">Step 8 Dossier:</span>
+                        <button
+                          type="button"
+                          onClick={() => handleShareAdvanceConfirmationWhatsApp()}
+                          className="px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1 bg-[#25D366] hover:bg-[#1EBE5D] text-white shadow-2xs transition-all cursor-pointer"
+                        >
+                          <MessageCircle className="w-3 h-3" />
+                          <span>Share Dossier on WhatsApp</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Amount (₹ INR) *</label>

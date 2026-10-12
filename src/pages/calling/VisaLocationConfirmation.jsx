@@ -56,7 +56,7 @@ export default function VisaLocationConfirmation() {
     try {
       const [leadsRes, usersRes] = await Promise.allSettled([
         apiGetLeads({
-          stage: 'CALLING_SCREENING',
+          stage: 'ALL',
           callingStaff: staffFilter !== 'ALL' ? staffFilter : undefined,
           search: searchQuery.trim() || undefined
         }),
@@ -64,7 +64,15 @@ export default function VisaLocationConfirmation() {
       ]);
 
       if (leadsRes.status === 'fulfilled' && leadsRes.value?.data) {
-        setLeads(leadsRes.value.data);
+        const queueLeads = leadsRes.value.data.filter(l => 
+          l.currentStage === 'CALLING_SCREENING' ||
+          l.medicalDetails?.status === 'FIT' ||
+          l.closureStatus === 'CLOSED_NO_ADVANCE' ||
+          l.locationConfirmation?.isConfirmed ||
+          l.currentStage === 'MEDICAL_PROCESS' ||
+          l.currentStage === 'STAFF_HEAD_HANDLING'
+        );
+        setLeads(queueLeads);
       } else {
         setLeads([]);
       }

@@ -49,9 +49,9 @@ export default function AdvanceCollection() {
     try {
       const res = await apiGetLeads({ stage: 'ALL' });
       if (res?.success && res.data) {
-        // Candidates who are at Medical, Accounts Collection, Staff Head Handling or have advance paid
+        // Candidates who are at Medical, Company Confirmation, Accounts Collection, Staff Head Handling or have advance paid
         const queue = res.data.filter(l => 
-          ['MEDICAL_PROCESS', 'ACCOUNTS_COLLECTION', 'STAFF_HEAD_HANDLING'].includes(l.currentStage) ||
+          ['MEDICAL_PROCESS', 'COMPANY_CONFIRMATION', 'ACCOUNTS_COLLECTION', 'STAFF_HEAD_HANDLING'].includes(l.currentStage) ||
           (l.paymentDetails?.advancePaid && l.paymentDetails.advancePaid > 0) ||
           (l.paymentDetails?.servicePaid && l.paymentDetails.servicePaid > 0)
         );
@@ -129,6 +129,52 @@ export default function AdvanceCollection() {
     }
   };
 
+  // Share Step 8: After Advance Confirmation Dossier via WhatsApp
+  const handleShareAdvanceConfirmationViaWhatsApp = (c) => {
+    const target = c || payModal;
+    if (!target) return;
+    const phone = target.phone || target.applicationForm?.phone || '';
+    let digits = String(phone).replace(/\D/g, '');
+    if (digits.length === 10) digits = '91' + digits;
+
+    if (!digits) {
+      Swal.fire({ icon: 'warning', title: 'Phone Missing', text: 'Candidate phone number is not available for WhatsApp.' });
+      return;
+    }
+
+    const cName = target.candidateName || target.name || 'Candidate';
+    const passport = target.passportNumber || 'N/A';
+    const trade = target.trade || 'General Worker';
+    const company = target.companyConfirmation?.companyName || 'Overseas Employer';
+    const p = target.paymentDetails || {};
+    const amt = target === payModal ? (Number(formValues.servicePaid) || 0) : (p.advancePaid || p.servicePaid || 5000);
+    const rNo = target === payModal ? (formValues.receiptNo || 'ADV-BOOKING') : (p.receiptNo || 'ADV-BOOKING');
+    const mode = target === payModal ? formValues.paymentMode : (p.paymentMode || 'UPI');
+    const totalFee = (Number(p.serviceFee) || 9500) + (Number(p.medicalFee) || 2500);
+    const balance = Math.max(0, totalFee - amt);
+
+    const text = `*CHHAYA INTERNATIONAL PVT LTD*\n*STEP 8: AFTER ADVANCE CONFIRMATION DOSSIER*\n` +
+      `----------------------------------------\n` +
+      `Dear *${cName}*,\n\n` +
+      `Your advance booking amount of *₹${Number(amt).toLocaleString('en-IN')}* has been officially received and credited to your Bill Book ledger.\n\n` +
+      `📋 *Payment & Booking Ledger:*\n` +
+      `• Receipt No: ${rNo}\n` +
+      `• Payment Mode: ${mode}\n` +
+      `• Candidate Passport: ${passport}\n` +
+      `• Selected Company: ${company}\n` +
+      `• Position/Trade: ${trade}\n` +
+      `• Remaining Balance: ₹${balance.toLocaleString('en-IN')}\n\n` +
+      `✅ *Confirmed Process Terms:*\n` +
+      `1. Advance payment condition and milestone stages explained.\n` +
+      `2. Overseas recruitment & visa processing terms accepted.\n` +
+      `3. Voice confirmation recording verified and archived.\n\n` +
+      `Your file is now forwarded to *Step 9: Staff Head Handling* for document verification.\n\n` +
+      `Best Regards,\nChhaya International Pvt Ltd`;
+
+    const waUrl = `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
+    window.open(waUrl, '_blank');
+  };
+
   // Save Advance Payment
   const handleCollectAdvance = async (e) => {
     e.preventDefault();
@@ -141,6 +187,18 @@ export default function AdvanceCollection() {
 
     // Strict validation rules for advance (service fee)
     if (sPaid > 0) {
+      // Step 7 Proposal Acceptance Gate:
+      const compStatus = payModal.companyConfirmation?.status;
+      const isAccepted = compStatus === 'AGREEMENT_ACCEPTED' || payModal.companyConfirmation?.clientAccepted === true;
+      if (!isAccepted) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Proposal Acceptance Required (Step 7)',
+          text: 'Client dwara Step 7: Proposal / Agreement swikar (Accepted) kiye jane ke baad hi advance amount liya ja sakta hai! Uske pehle advance lena strictly prohibited hai.'
+        });
+        return;
+      }
+
       if (!reportSentStatus) {
         Swal.fire({
           icon: 'warning',
@@ -546,9 +604,18 @@ export default function AdvanceCollection() {
                             <span>{(candidate.billBook?.transactions || []).some(t => t.status === 'PENDING_VERIFICATION') ? 'Verify' : 'Ledger'}</span>
                           </button>
 
-                          {/* View Receipt & Print/Download */}
+                          {/* View Receipt & Print/Download & WhatsApp */}
                           {isPaid && (
                             <>
+                              <button
+                                type="button"
+                                onClick={() => handleShareAdvanceConfirmationViaWhatsApp(candidate)}
+                                className="h-7 w-7 border border-emerald-300 bg-emerald-50 hover:bg-[#25D366] hover:text-white text-[#25D366] rounded-lg flex items-center justify-center transition-colors cursor-pointer"
+                                title="Share Step 8 Confirmation Dossier on WhatsApp"
+                              >
+                                <MessageCircle className="w-3.5 h-3.5" />
+                              </button>
+
                               <button
                                 type="button"
                                 onClick={() => printInvoiceReceipt(candidate)}
@@ -618,6 +685,44 @@ export default function AdvanceCollection() {
                   <span className="font-bold text-purple-700">{payModal.trade || 'General Worker'}</span>
                 </div>
               </div>
+
+              {/* Step 7 Company Proposal & Agreement Gate */}
+              {(() => {
+                const isAgreementAccepted = payModal.companyConfirmation?.status === 'AGREEMENT_ACCEPTED' || 
+                                            payModal.companyConfirmation?.clientAccepted === true;
+                return (
+                  <div className={`p-3 rounded-xl border transition-all ${
+                    isAgreementAccepted 
+                      ? 'border-emerald-200 bg-emerald-50/70 text-emerald-900' 
+                      : 'border-rose-300 bg-rose-50/90 text-rose-900'
+                  }`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-start gap-2">
+                        {isAgreementAccepted ? (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                        ) : (
+                          <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                        )}
+                        <div>
+                          <div className="font-bold text-xs flex items-center gap-1.5">
+                            <span>Step 7: Company Confirmation & Proposal</span>
+                            <span className={`text-[9.5px] font-extrabold uppercase px-1.5 py-0.2 rounded ${
+                              isAgreementAccepted ? 'bg-emerald-200 text-emerald-800' : 'bg-rose-200 text-rose-800'
+                            }`}>
+                              {isAgreementAccepted ? 'Proposal Accepted' : 'Acceptance Required'}
+                            </span>
+                          </div>
+                          <p className="text-[11px] mt-0.5 leading-snug">
+                            {isAgreementAccepted 
+                              ? `Employer: ${payModal.companyConfirmation?.companyName || 'Confirmed'} • Role: ${payModal.companyConfirmation?.positionOffered || payModal.trade || 'General Worker'}`
+                              : 'Client dwara proposal / agreement swikar hone ke bad hi advance amount liya jayega, uske pahale nahi! Pehle Step 7 proposal accept karein.'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Medical Report PDF Delivery Status (Mandatory before advance) */}
               <div className={`p-3 rounded-xl border transition-all ${
@@ -804,6 +909,20 @@ export default function AdvanceCollection() {
                         * Recording link is required to book service advance.
                       </span>
                     )}
+                  </div>
+
+                  {/* Share After Advance Confirmation Dossier */}
+                  <div className="pt-2 border-t border-purple-200/80 flex items-center justify-between">
+                    <span className="text-[11px] text-purple-900 font-medium">After Advance Confirmation PDF / Dossier:</span>
+                    <button
+                      type="button"
+                      onClick={() => handleShareAdvanceConfirmationViaWhatsApp(payModal)}
+                      className="px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1 bg-[#25D366] hover:bg-[#1EBE5D] text-white shadow-2xs transition-all cursor-pointer"
+                      title="Share Step 8 Confirmation Dossier directly on WhatsApp"
+                    >
+                      <MessageCircle className="w-3 h-3" />
+                      <span>Share on WhatsApp</span>
+                    </button>
                   </div>
                 </div>
               )}
