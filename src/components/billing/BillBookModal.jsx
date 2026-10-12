@@ -483,6 +483,24 @@ export default function BillBookModal({ isOpen, onClose, lead, onUpdated }) {
             </div>
           </div>
 
+          {/* Pending Verification Notice Banner */}
+          {((billBook.transactions || []).some(t => t.status === 'PENDING_VERIFICATION' || (!t.status && t.type !== 'REFUND'))) && (
+            <div className="mt-3 p-3 bg-amber-50 dark:bg-amber-950/40 rounded-xl border border-amber-300 dark:border-amber-700/60 flex flex-wrap items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-amber-600 animate-pulse shrink-0" />
+                <span className="font-bold text-amber-900 dark:text-amber-200">
+                  ⚠️ {(billBook.transactions || []).filter(t => t.status === 'PENDING_VERIFICATION' || (!t.status && t.type !== 'REFUND')).length} Payment Transaction(s) Awaiting Admin Verification!
+                </span>
+                <span className="text-amber-700 dark:text-amber-300 font-bold hidden sm:inline">
+                  (Total: ₹{(billBook.transactions || []).filter(t => t.status === 'PENDING_VERIFICATION' || (!t.status && t.type !== 'REFUND')).reduce((s, t) => s + (Number(t.amount) || 0), 0).toLocaleString('en-IN')})
+                </span>
+              </div>
+              <div className="text-[11px] text-amber-800 dark:text-amber-300 font-semibold">
+                Click <span className="underline font-bold text-emerald-700">"Verify"</span> in the table below to credit to official ledger.
+              </div>
+            </div>
+          )}
+
           {/* Quick Action Buttons */}
           <div className="flex flex-wrap items-center justify-between gap-3 mt-4 pt-3 border-t border-slate-200 dark:border-slate-700/60">
             <div className="flex space-x-2">

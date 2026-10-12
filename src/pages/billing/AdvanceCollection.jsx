@@ -3,13 +3,14 @@ import {
   ChevronRight, Banknote, Receipt, CheckCircle2, Search, 
   RefreshCw, Loader2, DollarSign, AlertCircle, 
   CreditCard, Eye, Printer, X, Check, ShieldCheck,
-  AlertTriangle, ExternalLink, Volume2, FileCheck2, MessageCircle, Download
+  AlertTriangle, ExternalLink, Volume2, FileCheck2, MessageCircle, Download, Building2, Clock
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
-import { apiGetLeads, apiRecordPaymentBooking, apiSendMedicalReportPdf } from '../../utils/api';
+import { apiGetLeads, apiRecordPaymentBooking, apiSendMedicalReportPdf, apiVerifyBillBookTransaction } from '../../utils/api';
 import { generateInvoicePdf, printInvoiceReceipt } from '../../utils/invoicePdfGenerator';
 import BillBookModal from '../../components/billing/BillBookModal';
+import CompanyConfirmationModal from '../../components/leads/CompanyConfirmationModal';
 
 export default function AdvanceCollection() {
   const navigate = useNavigate();
@@ -28,6 +29,7 @@ export default function AdvanceCollection() {
   const [payModal, setPayModal] = useState(null);
   const [viewReceiptModal, setViewReceiptModal] = useState(null);
   const [billBookCandidate, setBillBookCandidate] = useState(null);
+  const [companyConfCandidate, setCompanyConfCandidate] = useState(null);
   const [formValues, setFormValues] = useState({
     servicePaid: '5000',
     medicalPaid: '2500',
@@ -258,36 +260,96 @@ export default function AdvanceCollection() {
     }
   };
 
+  // Quick 1-click verify directly from Advance Collection table
+  const handleDirectVerify = async (candidate, tx) => {
+    const result = await Swal.fire({
+      title: 'Verify Advance Payment?',
+      html: `<div class="text-left text-sm text-gray-600">
+        <p class="mb-2">Candidate: <strong class="text-gray-900">${candidate.candidateName}</strong></p>
+        <p class="mb-2">Receipt No: <strong class="text-blue-600">${tx.receiptNo}</strong></p>
+        <p class="mb-2">Amount: <strong class="text-emerald-600 font-bold">₹${Number(tx.amount).toLocaleString('en-IN')}</strong> (${tx.paymentMode || 'UPI'})</p>
+        ${tx.referenceNo ? `<p class="mb-2">Reference / UTR: <strong class="text-gray-800 font-mono">${tx.referenceNo}</strong></p>` : ''}
+        <p class="text-xs text-gray-500 mt-2">By verifying, this payment will be formally credited to the candidate's Bill Book ledger, and deducted from balance due.</p>
+      </div>`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#059669',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Yes, Verify & Credit',
+      cancelButtonText: 'Cancel'
+    });
+    if (!result.isConfirmed) return;
+
+    setActionLoadingId(candidate._id);
+    try {
+      await apiVerifyBillBookTransaction(candidate._id, tx.receiptNo);
+      Swal.fire({
+        icon: 'success',
+        title: 'Payment Verified!',
+        text: `Receipt ${tx.receiptNo} (₹${tx.amount}) successfully verified and credited to ledger!`,
+        timer: 2000
+      });
+      fetchAdvanceQueue();
+    } catch (err) {
+      Swal.fire({ icon: 'error', title: 'Verification Failed', text: err.message || 'Could not verify payment' });
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
   // Dynamic KPI Stats
   const metrics = useMemo(() => {
     let totalQueue = candidates.length;
-    let totalCollected = 0;
-    let paidCount = 0;
-    let pendingCount = 0;
+    let totalVerified = 0;
+    let totalPendingVerification = 0;
+    let pendingVerificationCount = 0;
+    let verifiedCount = 0;
+    let awaitingAdvanceCount = 0;
 
     candidates.forEach(c => {
       const p = c.paymentDetails || {};
-      const paid = Number(p.advancePaid || p.totalPaid || (p.servicePaid || 0) + (p.medicalPaid || 0));
-      totalCollected += paid;
-      if (paid > 0) {
-        paidCount++;
-      } else {
-        pendingCount++;
+      const bb = c.billBook || {};
+      const txs = bb.transactions || [];
+
+      const verified = Number(bb.totalReceived || p.advancePaid || 0);
+      const pendingTxs = txs.filter(t => t.status === 'PENDING_VERIFICATION' || (!t.status && t.type !== 'REFUND'));
+      const pendingSum = pendingTxs.reduce((s, t) => s + (Number(t.amount) || 0), 0) || Number(bb.pendingVerification || p.pendingAdvance || 0);
+
+      totalVerified += verified;
+      if (pendingTxs.length > 0 || pendingSum > 0) {
+        pendingVerificationCount++;
+        totalPendingVerification += pendingSum;
+      }
+
+      if (verified > 0) {
+        verifiedCount++;
+      } else if (pendingTxs.length === 0 && pendingSum === 0) {
+        awaitingAdvanceCount++;
       }
     });
 
-    return { totalQueue, totalCollected, paidCount, pendingCount };
+    return { 
+      totalQueue, 
+      totalVerified, 
+      totalPendingVerification, 
+      pendingVerificationCount, 
+      verifiedCount, 
+      awaitingAdvanceCount 
+    };
   }, [candidates]);
 
   // Filtered Candidates
   const filteredCandidates = useMemo(() => {
     return candidates.filter(c => {
       const p = c.paymentDetails || {};
-      const paid = Number(p.advancePaid || p.totalPaid || (p.servicePaid || 0) + (p.medicalPaid || 0));
-      const isPaid = paid > 0;
+      const bb = c.billBook || {};
+      const txs = bb.transactions || [];
+      const verified = Number(bb.totalReceived || p.advancePaid || 0);
+      const hasPendingTx = txs.some(t => t.status === 'PENDING_VERIFICATION' || (!t.status && t.type !== 'REFUND')) || Number(bb.pendingVerification || p.pendingAdvance || 0) > 0;
 
-      if (filterTab === 'PENDING' && isPaid) return false;
-      if (filterTab === 'PAID' && !isPaid) return false;
+      if (filterTab === 'PENDING_VERIF' && !hasPendingTx) return false;
+      if (filterTab === 'PAID' && verified <= 0) return false;
+      if (filterTab === 'AWAITING' && (verified > 0 || hasPendingTx)) return false;
 
       if (searchTerm.trim()) {
         const q = searchTerm.toLowerCase();
@@ -379,51 +441,57 @@ export default function AdvanceCollection() {
           </div>
         </div>
 
-        {/* Total Advance Funds Collected */}
+        {/* Total Advance Funds Verified */}
         <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between text-gray-500 mb-2">
-            <span className="text-[11.5px] font-bold uppercase tracking-wider text-emerald-700">Advance Collected</span>
+            <span className="text-[11.5px] font-bold uppercase tracking-wider text-emerald-700">Advance Verified</span>
             <div className="w-7 h-7 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <DollarSign className="w-4 h-4" />
-            </div>
-          </div>
-          <div>
-            <div className="text-[22px] font-black text-emerald-600 font-mono leading-none">
-              {loading ? <Loader2 className="w-5 h-5 animate-spin text-gray-400" /> : `₹ ${metrics.totalCollected.toLocaleString()}`}
-            </div>
-            <div className="text-[11px] text-emerald-600 font-medium mt-1">Booking escrow funds</div>
-          </div>
-        </div>
-
-        {/* Pending Advance */}
-        <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between text-gray-500 mb-2">
-            <span className="text-[11.5px] font-bold uppercase tracking-wider text-amber-700">Awaiting Advance</span>
-            <div className="w-7 h-7 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-              <Receipt className="w-4 h-4" />
-            </div>
-          </div>
-          <div>
-            <div className="text-[22px] font-black text-amber-600 font-mono leading-none">
-              {loading ? <Loader2 className="w-5 h-5 animate-spin text-gray-400" /> : metrics.pendingCount}
-            </div>
-            <div className="text-[11px] text-amber-600 font-medium mt-1">Collection action required</div>
-          </div>
-        </div>
-
-        {/* Advance Cleared */}
-        <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between text-gray-500 mb-2">
-            <span className="text-[11.5px] font-bold uppercase tracking-wider text-blue-700">Advance Cleared</span>
-            <div className="w-7 h-7 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
               <ShieldCheck className="w-4 h-4" />
             </div>
           </div>
           <div>
-            <div className="text-[22px] font-black text-blue-600 font-mono leading-none">
-              {loading ? <Loader2 className="w-5 h-5 animate-spin text-gray-400" /> : metrics.paidCount}
+            <div className="text-[22px] font-black text-emerald-600 font-mono leading-none">
+              {loading ? <Loader2 className="w-5 h-5 animate-spin text-gray-400" /> : `₹ ${metrics.totalVerified.toLocaleString()}`}
             </div>
-            <div className="text-[11px] text-blue-600 font-medium mt-1">Sent to Staff Head</div>
+            <div className="text-[11px] text-emerald-600 font-medium mt-1">Cleared in verified ledger</div>
+          </div>
+        </div>
+
+        {/* Awaiting Admin Verification */}
+        <div className={`p-4 rounded-2xl border shadow-xs flex flex-col justify-between transition-all ${
+          metrics.pendingVerificationCount > 0 
+            ? 'bg-amber-50/60 border-amber-300 ring-2 ring-amber-200/50' 
+            : 'bg-white border-gray-200/80'
+        }`}>
+          <div className="flex items-center justify-between text-gray-500 mb-2">
+            <span className="text-[11.5px] font-bold uppercase tracking-wider text-amber-700">Awaiting Verification</span>
+            <div className={`w-7 h-7 rounded-xl flex items-center justify-center ${metrics.pendingVerificationCount > 0 ? 'bg-amber-200 text-amber-800' : 'bg-amber-50 text-amber-600'}`}>
+              <Clock className="w-4 h-4" />
+            </div>
+          </div>
+          <div>
+            <div className="text-[22px] font-black text-amber-700 font-mono leading-none">
+              {loading ? <Loader2 className="w-5 h-5 animate-spin text-gray-400" /> : `₹ ${metrics.totalPendingVerification.toLocaleString()}`}
+            </div>
+            <div className="text-[11px] text-amber-700 font-bold mt-1">
+              {metrics.pendingVerificationCount} payments pending admin action
+            </div>
+          </div>
+        </div>
+
+        {/* Awaiting Advance */}
+        <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between text-gray-500 mb-2">
+            <span className="text-[11.5px] font-bold uppercase tracking-wider text-slate-700">Awaiting Advance</span>
+            <div className="w-7 h-7 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
+              <Receipt className="w-4 h-4" />
+            </div>
+          </div>
+          <div>
+            <div className="text-[22px] font-black text-slate-700 font-mono leading-none">
+              {loading ? <Loader2 className="w-5 h-5 animate-spin text-gray-400" /> : metrics.awaitingAdvanceCount}
+            </div>
+            <div className="text-[11px] text-slate-500 font-medium mt-1">Collection action required</div>
           </div>
         </div>
 
@@ -436,8 +504,9 @@ export default function AdvanceCollection() {
           <div className="flex items-center gap-1.5 bg-gray-50/80 p-1 rounded-xl border border-gray-200/60 overflow-x-auto">
             {[
               { key: 'ALL', label: 'All Candidates', count: candidates.length },
-              { key: 'PENDING', label: 'Pending Advance', count: metrics.pendingCount },
-              { key: 'PAID', label: 'Advance Paid', count: metrics.paidCount },
+              { key: 'PENDING_VERIF', label: 'Pending Verification', count: metrics.pendingVerificationCount, highlight: true },
+              { key: 'PAID', label: 'Advance Verified', count: metrics.verifiedCount },
+              { key: 'AWAITING', label: 'Awaiting Advance', count: metrics.awaitingAdvanceCount },
             ].map(tab => (
               <button
                 key={tab.key}
@@ -450,7 +519,9 @@ export default function AdvanceCollection() {
               >
                 <span>{tab.label}</span>
                 <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                  filterTab === tab.key ? 'bg-purple-50 text-purple-600' : 'bg-gray-200/80 text-gray-600'
+                  tab.highlight && tab.count > 0
+                    ? 'bg-amber-100 text-amber-800'
+                    : filterTab === tab.key ? 'bg-purple-50 text-purple-600' : 'bg-gray-200/80 text-gray-600'
                 }`}>
                   {tab.count}
                 </span>
@@ -506,11 +577,16 @@ export default function AdvanceCollection() {
               ) : (
                 filteredCandidates.map((candidate) => {
                   const p = candidate.paymentDetails || {};
+                  const bb = candidate.billBook || {};
+                  const txs = bb.transactions || [];
                   const sFee = Number(p.serviceFee) || 9500;
                   const mFee = Number(p.medicalFee) || 2500;
                   const totalPayable = sFee + mFee;
-                  const advancePaid = Number(p.advancePaid || p.totalPaid || (p.servicePaid || 0) + (p.medicalPaid || 0));
-                  const isPaid = advancePaid > 0;
+                  const advanceVerified = Number(bb.totalReceived || p.advancePaid || 0);
+                  const pendingTxs = txs.filter(t => t.status === 'PENDING_VERIFICATION' || (!t.status && t.type !== 'REFUND'));
+                  const pendingAmount = pendingTxs.reduce((s, t) => s + (Number(t.amount) || 0), 0) || Number(bb.pendingVerification || p.pendingAdvance || 0);
+                  const hasPendingTx = pendingTxs.length > 0 || pendingAmount > 0;
+                  const latestPendingTx = pendingTxs[pendingTxs.length - 1];
 
                   return (
                     <tr key={candidate._id} className="hover:bg-purple-50/30 transition-colors">
@@ -545,20 +621,34 @@ export default function AdvanceCollection() {
                       </td>
 
                       {/* Advance Paid */}
-                      <td className="py-3 px-4 font-mono text-right font-bold text-emerald-600">
-                        {isPaid ? `₹ ${advancePaid.toLocaleString()}` : '₹ 0'}
+                      <td className="py-3 px-4 font-mono text-right font-bold">
+                        {advanceVerified > 0 ? (
+                          <div className="text-emerald-600 font-black">₹ {advanceVerified.toLocaleString()}</div>
+                        ) : (
+                          <div className="text-gray-400">₹ 0</div>
+                        )}
+                        {hasPendingTx && (
+                          <div className="text-[10.5px] text-amber-700 font-black mt-0.5 inline-block px-1.5 py-0.5 bg-amber-50 rounded border border-amber-200">
+                            + ₹{pendingAmount.toLocaleString()} Pending
+                          </div>
+                        )}
                       </td>
 
                       {/* Status */}
                       <td className="py-3 px-4 text-center">
-                        {isPaid ? (
+                        {hasPendingTx ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10.5px] font-black bg-amber-100/80 text-amber-900 border border-amber-300 shadow-2xs">
+                            <Clock className="w-3 h-3 text-amber-700" />
+                            <span>Pending Verif. (₹{pendingAmount.toLocaleString()})</span>
+                          </span>
+                        ) : advanceVerified > 0 ? (
                           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                             <Check className="w-3 h-3 text-emerald-600" />
-                            Paid ₹{advancePaid.toLocaleString()}
+                            <span>Verified (₹{advanceVerified.toLocaleString()})</span>
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                            Pending Advance
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-gray-100 text-gray-600 border border-gray-200">
+                            Awaiting Advance
                           </span>
                         )}
                       </td>
@@ -567,7 +657,20 @@ export default function AdvanceCollection() {
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           
-                          {/* Collect Advance Button */}
+                          {/* If Has Pending Transaction: 1-Click Direct Verify */}
+                          {hasPendingTx && latestPendingTx && (
+                            <button
+                              onClick={() => handleDirectVerify(candidate, latestPendingTx)}
+                              disabled={actionLoadingId === candidate._id}
+                              className="h-7 px-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-lg text-xs font-black flex items-center gap-1 transition-all cursor-pointer shadow-xs active:scale-95 animate-pulse"
+                              title={`Verify receipt #${latestPendingTx.receiptNo} of ₹${latestPendingTx.amount}`}
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+                              <span>Verify ₹{Number(latestPendingTx.amount).toLocaleString()}</span>
+                            </button>
+                          )}
+
+                          {/* Collect / Update Advance Button */}
                           <button
                             onClick={() => {
                               setPayModal(candidate);
@@ -587,21 +690,35 @@ export default function AdvanceCollection() {
                             className="h-7 px-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer active:scale-[0.98] shadow-xs"
                           >
                             <Banknote className="w-3 h-3" />
-                            <span>{isPaid ? 'Update' : 'Collect'}</span>
+                            <span>{advanceVerified > 0 ? 'Update' : 'Collect'}</span>
                           </button>
 
                           {/* Official Bill Book Ledger & Verification */}
                           <button
                             onClick={() => setBillBookCandidate(candidate)}
                             className={`h-7 px-2 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer shadow-xs ${
-                              (candidate.billBook?.transactions || []).some(t => t.status === 'PENDING_VERIFICATION')
-                                ? 'bg-amber-500 hover:bg-amber-600 text-white ring-2 ring-amber-300 animate-pulse'
+                              hasPendingTx
+                                ? 'bg-amber-500 hover:bg-amber-600 text-white ring-2 ring-amber-300'
                                 : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200'
                             }`}
                             title="Official Bill Book & Receipt Verification"
                           >
-                            <Receipt className={`w-3.5 h-3.5 ${(candidate.billBook?.transactions || []).some(t => t.status === 'PENDING_VERIFICATION') ? 'text-white' : 'text-emerald-600'}`} />
-                            <span>{(candidate.billBook?.transactions || []).some(t => t.status === 'PENDING_VERIFICATION') ? 'Verify' : 'Ledger'}</span>
+                            <Receipt className={`w-3.5 h-3.5 ${hasPendingTx ? 'text-white' : 'text-emerald-600'}`} />
+                            <span>Ledger</span>
+                          </button>
+
+                          {/* Step 7 Company Confirmation */}
+                          <button
+                            onClick={() => setCompanyConfCandidate(candidate)}
+                            className={`h-7 px-2 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer shadow-xs ${
+                              candidate.companyConfirmation?.status === 'AGREEMENT_ACCEPTED' || candidate.companyConfirmation?.clientAccepted
+                                ? 'bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200'
+                                : 'bg-amber-100 hover:bg-amber-200 text-amber-800 border border-amber-300'
+                            }`}
+                            title="Step 7: Company Confirmation & Proposal"
+                          >
+                            <Building2 className="w-3.5 h-3.5" />
+                            <span>Company</span>
                           </button>
 
                           {/* View Receipt & Print/Download & WhatsApp */}
@@ -717,6 +834,16 @@ export default function AdvanceCollection() {
                               ? `Employer: ${payModal.companyConfirmation?.companyName || 'Confirmed'} • Role: ${payModal.companyConfirmation?.positionOffered || payModal.trade || 'General Worker'}`
                               : 'Client dwara proposal / agreement swikar hone ke bad hi advance amount liya jayega, uske pahale nahi! Pehle Step 7 proposal accept karein.'}
                           </p>
+                          {!isAgreementAccepted && (
+                            <button
+                              type="button"
+                              onClick={() => setCompanyConfCandidate(payModal)}
+                              className="mt-2 px-2.5 py-1 text-xs font-bold bg-white text-rose-700 border border-rose-300 rounded-lg hover:bg-rose-50 shadow-2xs cursor-pointer flex items-center gap-1"
+                            >
+                              <Building2 className="w-3.5 h-3.5 text-rose-600" />
+                              <span>Open Step 7 Proposal Modal</span>
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1094,6 +1221,19 @@ export default function AdvanceCollection() {
         onClose={() => setBillBookCandidate(null)}
         lead={billBookCandidate}
         onUpdated={fetchAdvanceQueue}
+      />
+
+      {/* Step 7 Company Confirmation Modal */}
+      <CompanyConfirmationModal
+        isOpen={Boolean(companyConfCandidate)}
+        onClose={() => setCompanyConfCandidate(null)}
+        lead={companyConfCandidate}
+        onUpdated={() => {
+          fetchAdvanceQueue();
+          if (payModal && companyConfCandidate?._id === payModal._id) {
+            setPayModal(null);
+          }
+        }}
       />
 
     </div>

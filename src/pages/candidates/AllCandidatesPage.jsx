@@ -652,6 +652,35 @@ export default function AllCandidatesPage() {
                             <span>Docs</span>
                           </button>
 
+                          {/* Step 7: Company Confirmation & Proposal */}
+                          <button
+                            onClick={() => setCompanyConfCandidate(candidate)}
+                            className="h-7 px-2 bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                            title="Step 7: Company Confirmation & Proposal"
+                          >
+                            <Building2 className="w-3.5 h-3.5 text-teal-600" />
+                            <span>Company</span>
+                          </button>
+
+                          {/* Bill Book & Advance Ledger */}
+                          {(() => {
+                            const hasPending = (candidate.billBook?.transactions || []).some(t => t.status === 'PENDING_VERIFICATION');
+                            return (
+                              <button
+                                onClick={() => setBillBookCandidate(candidate)}
+                                className={`h-7 px-2 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer shadow-xs ${
+                                  hasPending
+                                    ? 'bg-amber-500 hover:bg-amber-600 text-white font-bold ring-2 ring-amber-300 animate-pulse'
+                                    : 'bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200'
+                                }`}
+                                title={hasPending ? "Payment Awaiting Admin Verification! Click to Verify." : "Official Bill Book & Advance Ledger"}
+                              >
+                                <Receipt className={`w-3.5 h-3.5 ${hasPending ? 'text-white' : 'text-purple-600'}`} />
+                                <span>{hasPending ? 'Verify Pay' : 'Bill Book'}</span>
+                              </button>
+                            );
+                          })()}
+
                           {/* File Closure */}
                           <button
                             onClick={() => setClosureCandidate(candidate)}
