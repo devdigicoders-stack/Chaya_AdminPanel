@@ -2,9 +2,11 @@ import { useState, useEffect, useRef } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
+import EnquiryModal from './EnquiryModal';
 
 const Layout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [enquiryModalOpen, setEnquiryModalOpen] = useState(false);
   const location = useLocation();
   const mainRef = useRef(null);
 
@@ -22,7 +24,10 @@ const Layout = () => {
     <div className="fixed inset-0 flex w-full h-full overflow-hidden bg-[#F8FAFC]">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="flex flex-col flex-1 min-w-0 min-h-0 h-full overflow-hidden">
-        <Header onToggleSidebar={() => setSidebarOpen(prev => !prev)} />
+        <Header 
+          onToggleSidebar={() => setSidebarOpen(prev => !prev)} 
+          onOpenEnquiryModal={() => setEnquiryModalOpen(true)}
+        />
         <main 
           ref={mainRef}
           className="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-3 sm:p-4 md:p-6 flex flex-col min-w-0 w-full overflow-x-hidden"
@@ -30,6 +35,12 @@ const Layout = () => {
           <Outlet />
         </main>
       </div>
+
+      {/* Global Universal Enquiry Desk Modal - Highest z-index over entire window */}
+      <EnquiryModal 
+        isOpen={enquiryModalOpen} 
+        onClose={() => setEnquiryModalOpen(false)} 
+      />
     </div>
   );
 };

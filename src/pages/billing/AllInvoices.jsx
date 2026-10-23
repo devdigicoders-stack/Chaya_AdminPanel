@@ -897,318 +897,371 @@ export default function AllInvoices() {
       )}
 
       {/* 6. Record Payment Modal */}
+      {/* 6. Record Payment Modal (Horizontal Responsive Layout) */}
       {paymentModalLead && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+        <div 
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-5 animate-in fade-in duration-200"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setPaymentModalLead(null);
+          }}
+        >
+          <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
             
-            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between bg-blue-50/70">
-              <div>
-                <h3 className="font-bold text-gray-900 text-[15px]">Record Payment Collection</h3>
-                <p className="text-[11px] text-gray-500">{paymentModalLead.candidateName} • {paymentModalLead.passportNumber || 'No Passport'}</p>
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-[#0B1B3D] to-[#1E3A8A] text-white shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center">
+                  <CreditCard className="w-5 h-5 text-blue-400" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base sm:text-lg text-white">Record Payment Collection</h3>
+                  <p className="text-xs text-blue-200">
+                    Candidate: <strong className="text-white">{paymentModalLead.candidateName}</strong> • Passport: <strong className="text-white font-mono">{paymentModalLead.passportNumber || 'No Passport'}</strong> • Trade: <span className="text-blue-100">{paymentModalLead.trade || 'General Worker'}</span>
+                  </p>
+                </div>
               </div>
-              <button onClick={() => setPaymentModalLead(null)} className="w-7 h-7 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center cursor-pointer">
-                <X className="w-4 h-4" />
+              <button 
+                onClick={() => setPaymentModalLead(null)} 
+                className="w-8 h-8 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 flex items-center justify-center cursor-pointer transition"
+              >
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSavePayment} className="p-5 space-y-4">
+            <form onSubmit={handleSavePayment} className="flex-1 overflow-y-auto p-6 space-y-5">
               
-              <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+              {/* Payment Stage Selection Tabs */}
+              <div className="bg-gray-50 p-2 rounded-xl border border-gray-200/80">
+                <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5 px-1">
                   Payment Collection Stage *
                 </label>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={() => setPaymentForm({ ...paymentForm, paymentType: 'ADVANCE' })}
-                    className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                    className={`py-2.5 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
                       paymentForm.paymentType === 'ADVANCE'
-                        ? 'border-blue-600 bg-blue-50 text-blue-700'
-                        : 'border-gray-200 bg-gray-50 text-gray-600'
+                        ? 'border-2 border-blue-600 bg-white text-blue-700 shadow-xs'
+                        : 'border border-transparent bg-transparent text-gray-600 hover:bg-gray-200/60'
                     }`}
                   >
-                    Advance Booking (Medical)
+                    <ShieldCheck className="w-4 h-4" />
+                    <span>Advance Booking (Medical Stage)</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setPaymentForm({ ...paymentForm, paymentType: 'FINAL' })}
-                    className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                    className={`py-2.5 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
                       paymentForm.paymentType === 'FINAL'
-                        ? 'border-emerald-600 bg-emerald-50 text-emerald-700'
-                        : 'border-gray-200 bg-gray-50 text-gray-600'
+                        ? 'border-2 border-emerald-600 bg-white text-emerald-700 shadow-xs'
+                        : 'border border-transparent bg-transparent text-gray-600 hover:bg-gray-200/60'
                     }`}
                   >
-                    Final Balance Settlement
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Final Balance Settlement</span>
                   </button>
                 </div>
               </div>
 
-              {paymentForm.paymentType === 'ADVANCE' ? (
-                <>
-                  {/* Medical Report PDF Delivery Status (Mandatory before advance) */}
-                  <div className={`p-3 rounded-xl border transition-all ${
-                    reportSentStatus 
-                      ? 'border-emerald-200 bg-emerald-50/70 text-emerald-900' 
-                      : 'border-amber-300 bg-amber-50/90 text-amber-900'
-                  }`}>
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-start gap-2">
-                        {reportSentStatus ? (
-                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                        ) : (
-                          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                        )}
-                        <div>
-                          <div className="font-bold text-xs flex items-center gap-1.5">
-                            <span>{reportSentStatus ? 'Medical Report PDF Delivered' : 'Medical Report PDF Required'}</span>
-                            <span className={`text-[9.5px] font-extrabold uppercase px-1.5 py-0.2 rounded ${
-                              reportSentStatus ? 'bg-emerald-200 text-emerald-800' : 'bg-amber-200 text-amber-800'
-                            }`}>
-                              {reportSentStatus ? 'Unlocked' : 'Locked'}
-                            </span>
+              {/* Two Column Horizontal Layout */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                
+                {/* Left Column: Requirements & Verifications (Span 7) */}
+                <div className="lg:col-span-7 space-y-4">
+                  {paymentForm.paymentType === 'ADVANCE' ? (
+                    <>
+                      {/* Medical Report PDF Delivery Status Box */}
+                      <div className={`p-4 rounded-xl border transition-all ${
+                        reportSentStatus 
+                          ? 'border-emerald-200 bg-emerald-50/70 text-emerald-900' 
+                          : 'border-amber-300 bg-amber-50/90 text-amber-900'
+                      }`}>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-start gap-2.5">
+                            {reportSentStatus ? (
+                              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                            ) : (
+                              <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                            )}
+                            <div>
+                              <div className="font-bold text-xs flex items-center gap-2">
+                                <span>{reportSentStatus ? 'Medical Report PDF Delivered' : 'Medical Report PDF Required'}</span>
+                                <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full ${
+                                  reportSentStatus ? 'bg-emerald-200 text-emerald-800' : 'bg-amber-200 text-amber-800'
+                                }`}>
+                                  {reportSentStatus ? 'Unlocked' : 'Locked'}
+                                </span>
+                              </div>
+                              <p className="text-[11px] mt-1 text-gray-600 leading-snug">
+                                {reportSentStatus 
+                                  ? 'Candidate has received the official Medical Report PDF. Advance service fee can be collected.' 
+                                  : 'Medical Report PDF must be sent to candidate before service fee advance can be saved.'}
+                              </p>
+                            </div>
                           </div>
-                          <p className="text-[11px] mt-0.5 text-gray-600 leading-snug">
-                            {reportSentStatus 
-                              ? 'Candidate has received the official Medical Report PDF. Advance service fee can be collected.' 
-                              : 'Medical Report PDF must be sent to candidate before service fee advance can be saved.'}
-                          </p>
-                        </div>
-                      </div>
 
-                      {reportSentStatus && paymentForm.reportUrl && (
-                        <a
-                          href={paymentForm.reportUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-2 py-0.5 text-[10.5px] font-bold bg-white border border-emerald-300 text-emerald-700 rounded-md hover:bg-emerald-50 inline-flex items-center gap-1 shrink-0"
-                        >
-                          <span>PDF</span>
-                          <ExternalLink className="w-2.5 h-2.5" />
-                        </a>
-                      )}
-                    </div>
-
-                    {/* Send / Update Action */}
-                    <div className="mt-2 pt-2 border-t border-amber-200/80 flex flex-col sm:flex-row items-center gap-2">
-                      <input
-                        type="url"
-                        placeholder="Report PDF URL or Google Drive link..."
-                        value={paymentForm.reportUrl}
-                        onChange={(e) => setPaymentForm({ ...paymentForm, reportUrl: e.target.value })}
-                        className="w-full sm:flex-1 px-2.5 py-1 bg-white border border-gray-300 rounded-lg text-xs font-mono focus:outline-none focus:border-blue-500"
-                      />
-                      <div className="flex items-center gap-1.5 w-full sm:w-auto shrink-0">
-                        <button
-                          type="button"
-                          onClick={handleShareReportViaWhatsApp}
-                          className="flex-1 sm:flex-none px-2.5 py-1 rounded-lg text-xs font-bold flex items-center justify-center gap-1 bg-[#25D366] hover:bg-[#1EBE5D] text-white shadow-2xs transition-all cursor-pointer"
-                          title="Share report PDF and verdict on candidate's WhatsApp"
-                        >
-                          <MessageCircle className="w-3 h-3" />
-                          <span>Share on WhatsApp</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleSendReportInInvoiceModal}
-                          disabled={sendingReport}
-                          className={`flex-1 sm:flex-none px-2.5 py-1 rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-all cursor-pointer ${
-                            reportSentStatus 
-                              ? 'bg-emerald-600 hover:bg-emerald-700 text-white' 
-                              : 'bg-amber-600 hover:bg-amber-700 text-white shadow-2xs'
-                          }`}
-                        >
-                          {sendingReport ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileCheck2 className="w-3 h-3" />}
-                          <span>{reportSentStatus ? 'Update PDF' : 'Mark Report Sent'}</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                        Service Fee Paid (₹) *
-                      </label>
-                      <input
-                        type="number"
-                        required
-                        placeholder="e.g. 5000"
-                        value={paymentForm.servicePaid}
-                        onChange={(e) => setPaymentForm({ ...paymentForm, servicePaid: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-mono font-bold focus:outline-none focus:border-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                        Medical Fee Paid (₹) *
-                      </label>
-                      <input
-                        type="number"
-                        required
-                        placeholder="e.g. 2500"
-                        value={paymentForm.medicalPaid}
-                        onChange={(e) => setPaymentForm({ ...paymentForm, medicalPaid: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-mono font-bold focus:outline-none focus:border-blue-500"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Strict Confirmations when servicePaid > 0 */}
-                  {Number(paymentForm.servicePaid) > 0 && (
-                    <div className="p-3 rounded-xl border border-purple-200 bg-purple-50/50 space-y-2.5">
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-purple-900 text-xs flex items-center gap-1.5">
-                          <ShieldCheck className="w-4 h-4 text-purple-600" />
-                          Advance Verification Protocol (Mandatory)
-                        </span>
-                        <span className="text-[9.5px] font-bold bg-purple-200 text-purple-800 px-1.5 py-0.2 rounded-full">
-                          Required
-                        </span>
-                      </div>
-
-                      {/* Checkbox 1: After Advance Confirmation */}
-                      <label className="flex items-start gap-2 p-2 rounded-lg bg-white border border-purple-100 hover:border-purple-300 transition-all cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={paymentForm.afterAdvanceConfirmed}
-                          onChange={(e) => setPaymentForm({ ...paymentForm, afterAdvanceConfirmed: e.target.checked })}
-                          className="mt-0.5 h-3.5 w-3.5 rounded text-purple-600 border-gray-300 focus:ring-purple-500 cursor-pointer"
-                        />
-                        <div className="text-xs text-gray-700 leading-snug">
-                          <span className="font-bold text-gray-900">After Advance Confirmation *</span>
-                          <p className="text-[10.5px] text-gray-500 mt-0.5">
-                            Candidate has received medical report, agreed to service terms, and confirmed advance payment.
-                          </p>
-                        </div>
-                      </label>
-
-                      {/* Checkbox 2: Recording Confirmation */}
-                      <label className="flex items-start gap-2 p-2 rounded-lg bg-white border border-purple-100 hover:border-purple-300 transition-all cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={paymentForm.recordingConfirmed}
-                          onChange={(e) => setPaymentForm({ ...paymentForm, recordingConfirmed: e.target.checked })}
-                          className="mt-0.5 h-3.5 w-3.5 rounded text-purple-600 border-gray-300 focus:ring-purple-500 cursor-pointer"
-                        />
-                        <div className="text-xs text-gray-700 leading-snug">
-                          <span className="font-bold text-gray-900">Recording Confirmation *</span>
-                          <p className="text-[10.5px] text-gray-500 mt-0.5">
-                            Audio call recording confirming agreement to advance payment terms is completed and archived.
-                          </p>
-                        </div>
-                      </label>
-
-                      {/* Recording URL */}
-                      <div>
-                        <label className="block text-[11px] font-bold text-gray-800 mb-1 flex items-center justify-between">
-                          <span className="flex items-center gap-1">
-                            <Volume2 className="w-3.5 h-3.5 text-purple-600" />
-                            <span>Call Recording Audio URL / Drive Link *</span>
-                          </span>
-                          {paymentForm.recordingUrl?.trim() && (
+                          {reportSentStatus && paymentForm.reportUrl && (
                             <a
-                              href={paymentForm.recordingUrl}
+                              href={paymentForm.reportUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-[10px] text-purple-600 hover:underline inline-flex items-center gap-0.5"
+                              className="px-2.5 py-1 text-xs font-bold bg-white border border-emerald-300 text-emerald-700 rounded-lg hover:bg-emerald-50 inline-flex items-center gap-1 shrink-0 shadow-2xs"
                             >
-                              <span>Test Link</span>
-                              <ExternalLink className="w-2.5 h-2.5" />
+                              <span>View PDF</span>
+                              <ExternalLink className="w-3 h-3" />
                             </a>
                           )}
-                        </label>
-                        <input
-                          type="url"
-                          required={Number(paymentForm.servicePaid) > 0}
-                          placeholder="https://drive.google.com/... or cloud audio URL"
-                          value={paymentForm.recordingUrl}
-                          onChange={(e) => setPaymentForm({ ...paymentForm, recordingUrl: e.target.value })}
-                          className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-mono focus:outline-none focus:border-purple-500"
-                        />
-                        {!paymentForm.recordingUrl?.trim() && (
-                          <span className="text-[10px] text-red-600 font-semibold mt-0.5 block">
-                            * Recording link is required to book service advance.
-                          </span>
-                        )}
+                        </div>
+
+                        {/* Send / Update Action Inputs */}
+                        <div className="mt-3 pt-3 border-t border-amber-200/80 flex flex-col sm:flex-row items-center gap-2">
+                          <input
+                            type="url"
+                            placeholder="Report PDF URL or Google Drive link..."
+                            value={paymentForm.reportUrl}
+                            onChange={(e) => setPaymentForm({ ...paymentForm, reportUrl: e.target.value })}
+                            className="w-full sm:flex-1 px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-xs font-mono focus:outline-none focus:border-blue-500"
+                          />
+                          <div className="flex items-center gap-1.5 w-full sm:w-auto shrink-0">
+                            <button
+                              type="button"
+                              onClick={handleShareReportViaWhatsApp}
+                              className="flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 bg-[#25D366] hover:bg-[#1EBE5D] text-white shadow-xs transition-all cursor-pointer"
+                              title="Share report PDF and verdict on candidate's WhatsApp"
+                            >
+                              <MessageCircle className="w-3.5 h-3.5" />
+                              <span>Share WhatsApp</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleSendReportInInvoiceModal}
+                              disabled={sendingReport}
+                              className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                                reportSentStatus 
+                                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white' 
+                                  : 'bg-amber-600 hover:bg-amber-700 text-white shadow-xs'
+                              }`}
+                            >
+                              {sendingReport ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileCheck2 className="w-3.5 h-3.5" />}
+                              <span>{reportSentStatus ? 'Update PDF' : 'Mark Report Sent'}</span>
+                            </button>
+                          </div>
+                        </div>
                       </div>
+
+                      {/* Advance Verification Protocol (Mandatory Checkboxes) */}
+                      {Number(paymentForm.servicePaid) > 0 && (
+                        <div className="p-4 rounded-xl border border-purple-200 bg-purple-50/50 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-purple-900 text-xs flex items-center gap-1.5">
+                              <ShieldCheck className="w-4 h-4 text-purple-600" />
+                              Advance Verification Protocol (Mandatory)
+                            </span>
+                            <span className="text-[10px] font-bold bg-purple-200 text-purple-800 px-2 py-0.5 rounded-full">
+                              Required
+                            </span>
+                          </div>
+
+                          <label className="flex items-start gap-2.5 p-2.5 rounded-lg bg-white border border-purple-100 hover:border-purple-300 transition-all cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={paymentForm.afterAdvanceConfirmed}
+                              onChange={(e) => setPaymentForm({ ...paymentForm, afterAdvanceConfirmed: e.target.checked })}
+                              className="mt-0.5 h-4 w-4 rounded text-purple-600 border-gray-300 focus:ring-purple-500 cursor-pointer"
+                            />
+                            <div className="text-xs text-gray-700 leading-snug">
+                              <span className="font-bold text-gray-900">After Advance Confirmation *</span>
+                              <p className="text-[11px] text-gray-500 mt-0.5">
+                                Candidate has received medical report, agreed to service terms, and confirmed advance payment.
+                              </p>
+                            </div>
+                          </label>
+
+                          <label className="flex items-start gap-2.5 p-2.5 rounded-lg bg-white border border-purple-100 hover:border-purple-300 transition-all cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={paymentForm.recordingConfirmed}
+                              onChange={(e) => setPaymentForm({ ...paymentForm, recordingConfirmed: e.target.checked })}
+                              className="mt-0.5 h-4 w-4 rounded text-purple-600 border-gray-300 focus:ring-purple-500 cursor-pointer"
+                            />
+                            <div className="text-xs text-gray-700 leading-snug">
+                              <span className="font-bold text-gray-900">Recording Confirmation *</span>
+                              <p className="text-[11px] text-gray-500 mt-0.5">
+                                Audio call recording confirming agreement to advance payment terms is completed and archived.
+                              </p>
+                            </div>
+                          </label>
+
+                          <div>
+                            <label className="block text-xs font-bold text-gray-800 mb-1 flex items-center justify-between">
+                              <span className="flex items-center gap-1.5">
+                                <Volume2 className="w-3.5 h-3.5 text-purple-600" />
+                                <span>Call Recording Audio URL / Drive Link *</span>
+                              </span>
+                              {paymentForm.recordingUrl?.trim() && (
+                                <a
+                                  href={paymentForm.recordingUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-xs text-purple-600 hover:underline inline-flex items-center gap-1"
+                                >
+                                  <span>Test Link</span>
+                                  <ExternalLink className="w-3 h-3" />
+                                </a>
+                              )}
+                            </label>
+                            <input
+                              type="url"
+                              required={Number(paymentForm.servicePaid) > 0}
+                              placeholder="https://drive.google.com/... or cloud audio URL"
+                              value={paymentForm.recordingUrl}
+                              onChange={(e) => setPaymentForm({ ...paymentForm, recordingUrl: e.target.value })}
+                              className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs font-mono focus:outline-none focus:border-purple-500"
+                            />
+                            {!paymentForm.recordingUrl?.trim() && (
+                              <span className="text-[11px] text-red-600 font-semibold mt-1 block">
+                                * Recording link is required to book service advance.
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="p-5 rounded-xl border border-emerald-200 bg-emerald-50/50 space-y-2">
+                      <div className="flex items-center gap-2 text-emerald-800 font-bold text-sm">
+                        <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                        <span>Final Balance Collection Protocol</span>
+                      </div>
+                      <p className="text-xs text-emerald-700 leading-relaxed">
+                        Collect outstanding final balance for visa issuance and flight deployment. Bill book records this collection directly into the company ledger.
+                      </p>
                     </div>
                   )}
-                </>
-              ) : (
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                    Final Balance Amount Paid (₹) *
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    placeholder="e.g. 7000"
-                    value={paymentForm.amount}
-                    onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-mono font-bold text-emerald-700 focus:outline-none focus:border-emerald-500"
-                  />
                 </div>
-              )}
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                    Payment Mode *
-                  </label>
-                  <select
-                    value={paymentForm.paymentMode}
-                    onChange={(e) => setPaymentForm({ ...paymentForm, paymentMode: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs bg-white focus:outline-none focus:border-blue-500"
-                  >
-                    <option value="UPI">UPI / QR Code</option>
-                    <option value="Cash">Cash</option>
-                    <option value="Bank Transfer">Bank Transfer (IMPS/NEFT)</option>
-                    <option value="Cheque">Cheque</option>
-                  </select>
+                {/* Right Column: Amount & Transaction Details (Span 5) */}
+                <div className="lg:col-span-5 space-y-4 bg-gray-50/70 p-4 rounded-xl border border-gray-200">
+                  <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider pb-1 border-b border-gray-200 flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Transaction Amounts & Registry</span>
+                  </h4>
+
+                  {paymentForm.paymentType === 'ADVANCE' ? (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                          Service Fee Paid (₹) *
+                        </label>
+                        <input
+                          type="number"
+                          required
+                          placeholder="e.g. 5000"
+                          value={paymentForm.servicePaid}
+                          onChange={(e) => setPaymentForm({ ...paymentForm, servicePaid: e.target.value })}
+                          className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-mono font-bold focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                          Medical Fee Paid (₹) *
+                        </label>
+                        <input
+                          type="number"
+                          required
+                          placeholder="e.g. 2500"
+                          value={paymentForm.medicalPaid}
+                          onChange={(e) => setPaymentForm({ ...paymentForm, medicalPaid: e.target.value })}
+                          className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-mono font-bold focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                        Final Balance Paid (₹) *
+                      </label>
+                      <input
+                        type="number"
+                        required
+                        placeholder="e.g. 7000"
+                        value={paymentForm.amount}
+                        onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+                        className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-mono font-bold text-emerald-700 focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                        Payment Mode *
+                      </label>
+                      <select
+                        value={paymentForm.paymentMode}
+                        onChange={(e) => setPaymentForm({ ...paymentForm, paymentMode: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs bg-white focus:outline-none focus:border-blue-500"
+                      >
+                        <option value="UPI">UPI / QR Code</option>
+                        <option value="Cash">Cash</option>
+                        <option value="Bank Transfer">Bank Transfer (IMPS/NEFT)</option>
+                        <option value="Cheque">Cheque</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                        Receipt / UTR No *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. RCP-89212"
+                        value={paymentForm.receiptNo}
+                        onChange={(e) => setPaymentForm({ ...paymentForm, receiptNo: e.target.value })}
+                        className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-mono focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                      Remarks / Notes
+                    </label>
+                    <textarea
+                      rows={2}
+                      placeholder="Additional payment details or accountant remarks..."
+                      value={paymentForm.remarks}
+                      onChange={(e) => setPaymentForm({ ...paymentForm, remarks: e.target.value })}
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div className="p-3 bg-blue-50 rounded-xl border border-blue-100 text-[11px] text-blue-900 flex items-center justify-between">
+                    <span>Accountant Verification:</span>
+                    <span className="font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full text-[10px]">
+                      Pending Verification
+                    </span>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                    Receipt / UTR No *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. RCP-89212"
-                    value={paymentForm.receiptNo}
-                    onChange={(e) => setPaymentForm({ ...paymentForm, receiptNo: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-mono focus:outline-none focus:border-blue-500"
-                  />
-                </div>
+
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                  Remarks / Notes
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="Additional payment details or accountant remarks..."
-                  value={paymentForm.remarks}
-                  onChange={(e) => setPaymentForm({ ...paymentForm, remarks: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-gray-100">
+              {/* Modal Actions Footer */}
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
                 <button
                   type="button"
                   onClick={() => setPaymentModalLead(null)}
-                  className="h-9 px-3.5 border border-gray-200 rounded-lg text-xs font-semibold text-gray-600 hover:bg-gray-50 cursor-pointer"
+                  className="px-4 py-2.5 border border-gray-200 rounded-xl text-xs font-semibold text-gray-600 hover:bg-gray-100 transition cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={actionLoadingId !== null}
-                  className="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer active:scale-[0.98]"
+                  className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md transition cursor-pointer disabled:opacity-50"
                 >
-                  {actionLoadingId ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-                  <span>Save Payment</span>
+                  {actionLoadingId ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                  <span>Save Payment & Record Bill</span>
                 </button>
               </div>
 

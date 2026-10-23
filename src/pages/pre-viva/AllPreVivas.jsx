@@ -90,12 +90,18 @@ export default function AllPreVivas() {
       });
 
       if (res?.success) {
+        const routingLabel = 
+          evalDecision === 'CLEARED' ? 'Transferred to Step 07 Visa Processing.' :
+          evalDecision === 'RETURN_TO_STAFF_HEAD' ? 'Returned to Staff Head Desk for review.' :
+          evalDecision === 'REVERT_CALLING' ? 'Reverted to Calling Staff Queue for client follow-up.' :
+          'Marked for Retest / Hold.';
+
         Swal.fire({
           icon: 'success',
-          title: 'Evaluation Recorded!',
+          title: 'Evaluation & Routing Recorded!',
           html: `Candidate <b>${evalModal.candidateName}</b> evaluated as <b>${evalDecision}</b> (Score: ${evalScore}/100).<br>
-                 <span class="text-xs text-gray-500 mt-1 block">
-                   ${evalDecision === 'CLEARED' ? 'Transferred to Step 07 Visa Processing.' : 'Marked for Retest / Hold.'}
+                 <span class="text-xs text-gray-500 mt-1 block font-semibold text-purple-700">
+                   ${routingLabel}
                  </span>`,
           confirmButtonColor: '#2563EB'
         });
@@ -601,7 +607,7 @@ export default function AllPreVivas() {
               {/* Decision Radio */}
               <div>
                 <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
-                  Readiness Verdict *
+                  Readiness Verdict & Routing *
                 </label>
                 <div className="grid grid-cols-2 gap-2">
                   <label className={`p-2.5 rounded-xl border flex items-center gap-2 cursor-pointer transition-all ${
@@ -619,7 +625,7 @@ export default function AllPreVivas() {
                   </label>
 
                   <label className={`p-2.5 rounded-xl border flex items-center gap-2 cursor-pointer transition-all ${
-                    evalDecision === 'RETEST_HOLD' ? 'border-red-500 bg-red-50 text-red-900 font-bold' : 'border-gray-200'
+                    evalDecision === 'RETEST_HOLD' ? 'border-amber-500 bg-amber-50 text-amber-900 font-bold' : 'border-gray-200'
                   }`}>
                     <input
                       type="radio"
@@ -627,9 +633,37 @@ export default function AllPreVivas() {
                       value="RETEST_HOLD"
                       checked={evalDecision === 'RETEST_HOLD'}
                       onChange={() => setEvalDecision('RETEST_HOLD')}
-                      className="text-red-600"
+                      className="text-amber-600"
                     />
                     <span className="text-xs">Retest / Hold</span>
+                  </label>
+
+                  <label className={`p-2.5 rounded-xl border flex items-center gap-2 cursor-pointer transition-all ${
+                    evalDecision === 'RETURN_TO_STAFF_HEAD' ? 'border-purple-500 bg-purple-50 text-purple-900 font-bold' : 'border-gray-200'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="decision"
+                      value="RETURN_TO_STAFF_HEAD"
+                      checked={evalDecision === 'RETURN_TO_STAFF_HEAD'}
+                      onChange={() => setEvalDecision('RETURN_TO_STAFF_HEAD')}
+                      className="text-purple-600"
+                    />
+                    <span className="text-xs">Return to Staff Head</span>
+                  </label>
+
+                  <label className={`p-2.5 rounded-xl border flex items-center gap-2 cursor-pointer transition-all ${
+                    evalDecision === 'REVERT_CALLING' ? 'border-indigo-500 bg-indigo-50 text-indigo-900 font-bold' : 'border-gray-200'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="decision"
+                      value="REVERT_CALLING"
+                      checked={evalDecision === 'REVERT_CALLING'}
+                      onChange={() => setEvalDecision('REVERT_CALLING')}
+                      className="text-indigo-600"
+                    />
+                    <span className="text-xs">Revert to Calling</span>
                   </label>
                 </div>
               </div>

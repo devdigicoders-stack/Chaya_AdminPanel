@@ -7,7 +7,7 @@ import {
   Edit, Trash2, 
   Loader2, Power,
   ChevronRight, History, Clock, Sparkles, Activity, Globe, ArrowUpRight,
-  Lock, EyeOff, Copy
+  Lock, EyeOff, Copy, Target
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
@@ -18,6 +18,7 @@ import {
   apiToggleUserStatus, 
   apiDeleteUser,
   apiGetUserHistory,
+  apiUpdateUserTargets,
   getCurrentUser 
 } from '../../utils/api';
 
@@ -59,6 +60,13 @@ export default function UserManagement() {
   const [userHistoryLoading, setUserHistoryLoading] = useState(false);
   const [historyActiveTab, setHistoryActiveTab] = useState('ACTIONS'); // 'ACTIONS' | 'LOGINS'
   const [showViewPassword, setShowViewPassword] = useState(true);
+
+  // Target Assignment Modal State (Admin & Staff Head)
+  const [targetModalUser, setTargetModalUser] = useState(null);
+  const [targetMedicals, setTargetMedicals] = useState(0);
+  const [targetAdvances, setTargetAdvances] = useState(0);
+  const [targetMovedFiles, setTargetMovedFiles] = useState(0);
+  const [targetSaving, setTargetSaving] = useState(false);
 
   // Form State for Add User
   const [formName, setFormName] = useState('');
@@ -219,6 +227,43 @@ export default function UserManagement() {
       loadUsers();
     } catch (err) {
       Swal.fire({ icon: 'error', title: 'Update Failed', text: err.message || 'Could not update user details.' });
+    }
+  };
+
+  // Target Modal Open & Save
+  const handleOpenTargetModal = (user) => {
+    setTargetModalUser(user);
+    const existingTargets = user.monthlyTargets || {};
+    setTargetMedicals(existingTargets.medicalsTarget || 0);
+    setTargetAdvances(existingTargets.advancesTarget || 0);
+    setTargetMovedFiles(existingTargets.movedFilesTarget || 0);
+  };
+
+  const handleSaveTargets = async (e) => {
+    e.preventDefault();
+    if (!targetModalUser) return;
+    setTargetSaving(true);
+    try {
+      await apiUpdateUserTargets(targetModalUser._id, {
+        medicalsTarget: targetMedicals,
+        advancesTarget: targetAdvances,
+        movedFilesTarget: targetMovedFiles
+      });
+
+      Swal.fire({
+        icon: 'success',
+        title: 'Monthly Targets Assigned!',
+        html: `Targets for <b>${targetModalUser.name}</b> have been saved and synced directly to their Mobile App.<br><br>
+        <span class="text-xs text-gray-500">Medicals: ${targetMedicals} • Advances: ${targetAdvances} • Moved Files: ${targetMovedFiles}</span>`,
+        confirmButtonColor: '#2563EB'
+      });
+
+      setTargetModalUser(null);
+      loadUsers();
+    } catch (err) {
+      Swal.fire({ icon: 'error', title: 'Target Update Failed', text: err.message || 'Could not save targets.' });
+    } finally {
+      setTargetSaving(false);
     }
   };
 
@@ -782,6 +827,16 @@ export default function UserManagement() {
                           >
                             <Eye className="w-4 h-4" />
                           </button>
+
+                          {user.role === 'CALLING_STAFF' && (
+                            <button
+                              onClick={() => handleOpenTargetModal(user)}
+                              className="p-1.5 rounded-lg text-gray-500 hover:text-amber-600 hover:bg-amber-50 transition-colors cursor-pointer"
+                              title="Set Monthly Targets (Medicals, Advances, Moved Files)"
+                            >
+                              <Target className="w-4 h-4 text-amber-600" />
+                            </button>
+                          )}
 
                           <button
                             onClick={() => setEditModalUser({ ...user })}
@@ -1502,6 +1557,121 @@ export default function UserManagement() {
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* Target Assignment Modal (Admin & Staff Head) */}
+      {targetModalUser && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-gray-100 overflow-hidden transform transition-all">
+            {/* Modal Header */}
+            <div className="p-6 bg-gradient-to-r from-amber-500 to-orange-600 text-white flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center">
+                  <Target className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-[16px] leading-tight">Assign Monthly Targets</h3>
+                  <p className="text-amber-100 text-[11px] font-medium">For Calling Staff: {targetModalUser.name}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setTargetModalUser(null)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4 text-white" />
+              </button>
+            </div>
+
+            {/* Modal Form */}
+            <form onSubmit={handleSaveTargets} className="p-6 space-y-4">
+              <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-3.5 text-[11.5px] text-amber-900 leading-relaxed flex items-start gap-2.5">
+                <Sparkles className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <span>
+                  Targets assigned here sync live to <b>{targetModalUser.name}</b>'s mobile app dashboard under <b>"My Monthly Progress"</b>.
+                </span>
+              </div>
+
+              {/* Medicals Target */}
+              <div>
+                <label className="block text-[12px] font-bold text-gray-700 mb-1 flex items-center justify-between">
+                  <span>1. Medicals Target</span>
+                  <span className="text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">FIT Candidates Target</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0"
+                    value={targetMedicals}
+                    onChange={(e) => setTargetMedicals(e.target.value)}
+                    required
+                    placeholder="e.g. 15"
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[13px] font-bold text-gray-900 focus:outline-none focus:border-amber-500 focus:bg-white transition-colors"
+                  />
+                  <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[11px] font-bold text-gray-400">Medicals</span>
+                </div>
+              </div>
+
+              {/* Advances Target */}
+              <div>
+                <label className="block text-[12px] font-bold text-gray-700 mb-1 flex items-center justify-between">
+                  <span>2. Advances Target</span>
+                  <span className="text-[11px] font-semibold text-sky-600 bg-sky-50 px-2 py-0.5 rounded-md">Advance Files Target</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0"
+                    value={targetAdvances}
+                    onChange={(e) => setTargetAdvances(e.target.value)}
+                    required
+                    placeholder="e.g. 10"
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[13px] font-bold text-gray-900 focus:outline-none focus:border-amber-500 focus:bg-white transition-colors"
+                  />
+                  <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[11px] font-bold text-gray-400">Advances</span>
+                </div>
+              </div>
+
+              {/* Moved Files Target */}
+              <div>
+                <label className="block text-[12px] font-bold text-gray-700 mb-1 flex items-center justify-between">
+                  <span>3. Moved Files Target</span>
+                  <span className="text-[11px] font-semibold text-purple-600 bg-purple-50 px-2 py-0.5 rounded-md">Forwarded Files Target</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0"
+                    value={targetMovedFiles}
+                    onChange={(e) => setTargetMovedFiles(e.target.value)}
+                    required
+                    placeholder="e.g. 8"
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[13px] font-bold text-gray-900 focus:outline-none focus:border-amber-500 focus:bg-white transition-colors"
+                  />
+                  <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[11px] font-bold text-gray-400">Files</span>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setTargetModalUser(null)}
+                  className="px-4 py-2.5 text-[12px] font-bold text-gray-600 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={targetSaving}
+                  className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-xl text-[12px] font-bold shadow-md shadow-amber-500/20 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {targetSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Target className="w-4 h-4" />}
+                  <span>Save & Sync Target</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

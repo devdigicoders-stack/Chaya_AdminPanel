@@ -39,8 +39,14 @@ export default function AllMedicals() {
     fetchLeads();
   }, []);
 
-  // Real-time KPI Stats
+  // Real-time KPI Stats (Including Incoming Selected from Calling Staff)
   const totalCount = leads.length;
+  const selectedCount = leads.filter(l => 
+    l.selectionMode === 'DIRECT_CV' || 
+    l.selectionMode === 'INTERVIEW' || 
+    l.currentStage === 'MEDICAL_PROCESS' ||
+    l.currentStage === 'INITIAL_INTERVIEW'
+  ).length;
   const fitCount = leads.filter(l => l.medicalDetails?.status === 'FIT').length;
   const unfitCount = leads.filter(l => l.medicalDetails?.status === 'UNFIT').length;
   const scheduledCount = leads.filter(l => l.medicalDetails?.status === 'SCHEDULED').length;
@@ -147,13 +153,13 @@ export default function AllMedicals() {
         </div>
       )}
 
-      {/* 2. Dynamic KPI Stat Cards (Clean 5-Card Grid) */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5 mb-5 sm:mb-6">
+      {/* 2. Dynamic KPI Stat Cards (Clean 6-Card Grid) */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5 mb-5 sm:mb-6">
         
         {/* Total Medicals */}
         <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between text-gray-500 mb-2">
-            <span className="text-[11.5px] font-bold uppercase tracking-wider">Total Medical Files</span>
+            <span className="text-[11.5px] font-bold uppercase tracking-wider">Total Files</span>
             <div className="w-7 h-7 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
               <Users className="w-4 h-4" />
             </div>
@@ -166,10 +172,26 @@ export default function AllMedicals() {
           </div>
         </div>
 
+        {/* Selected from Calling / Interview */}
+        <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between text-gray-500 mb-2">
+            <span className="text-[11.5px] font-bold uppercase tracking-wider text-indigo-700">Selected Leads</span>
+            <div className="w-7 h-7 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+              <Sparkles className="w-4 h-4" />
+            </div>
+          </div>
+          <div>
+            <div className="text-[24px] font-black text-indigo-600 font-mono leading-none">
+              {loading ? <Loader2 className="w-5 h-5 animate-spin text-gray-400" /> : selectedCount}
+            </div>
+            <div className="text-[11px] text-indigo-600 font-semibold mt-1">Calling / Interview selected</div>
+          </div>
+        </div>
+
         {/* Passed (FIT) */}
         <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between text-gray-500 mb-2">
-            <span className="text-[11.5px] font-bold uppercase tracking-wider text-emerald-700">GAMCA FIT (Passed)</span>
+            <span className="text-[11.5px] font-bold uppercase tracking-wider text-emerald-700">GAMCA FIT</span>
             <div className="w-7 h-7 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
               <CheckCircle2 className="w-4 h-4" />
             </div>

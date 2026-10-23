@@ -69,7 +69,8 @@ export default function BillBookModal({ isOpen, onClose, lead, onUpdated }) {
 
   const currentUser = getCurrentUser() || {};
   const userRole = String(currentUser.role || 'ADMIN').toUpperCase();
-  const isAccountsOrAdmin = !currentUser.role || ['ADMIN', 'SUPER_ADMIN', 'ACCOUNTS', 'SUPER ADMINISTRATOR', 'ACCOUNTS MANAGER', 'STAFF_HEAD'].includes(userRole) || userRole.includes('ADMIN') || userRole.includes('ACCOUNT');
+  // Strict Business Rule: Only ACCOUNTS or ADMIN can approve/verify payments
+  const isAccountsOrAdmin = ['ADMIN', 'SUPER_ADMIN', 'ACCOUNTS', 'SUPER ADMINISTRATOR', 'ACCOUNTS MANAGER'].includes(userRole) || userRole.includes('ACCOUNT');
 
   const billBook = localLead?.billBook || {
     isLedgerOpen: false,

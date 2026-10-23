@@ -15,6 +15,8 @@ export default function CandidateRegistrationForm() {
   const navigate = useNavigate();
   const location = useLocation();
   const printRef = useRef(null);
+  const photoInputRef = useRef(null);
+  const signatureInputRef = useRef(null);
 
   // Read query params if redirected from Calling Queue or Leads
   const searchParams = new URLSearchParams(location.search);
@@ -99,11 +101,24 @@ export default function CandidateRegistrationForm() {
             address: l.address || l.applicationForm?.address || prev.address,
             state: l.state || l.applicationForm?.state || prev.state,
             pinCode: l.applicationForm?.pinCode || prev.pinCode,
-            dob: l.applicationForm?.dob || prev.dob,
+            dob: l.applicationForm?.dob ? l.applicationForm.dob.split('T')[0] : prev.dob,
             email: l.email || prev.email,
+            passportIssue: l.applicationForm?.passportIssueDate ? l.applicationForm.passportIssueDate.split('T')[0] : prev.passportIssue,
+            passportExpiry: l.applicationForm?.passportExpiry ? l.applicationForm.passportExpiry.split('T')[0] : prev.passportExpiry,
+            ecrStatus: l.applicationForm?.ecrStatus || prev.ecrStatus,
+            nationality: l.applicationForm?.nationality || prev.nationality,
+            medicalReport: l.applicationForm?.medicalStatus || prev.medicalReport,
+            pccStatus: l.applicationForm?.pccStatus || prev.pccStatus,
+            newExpectedSalary: l.applicationForm?.expectedSalary || prev.newExpectedSalary,
             officeConfirmationCountry: l.country || prev.officeConfirmationCountry,
-            lastExperience: l.applicationForm?.experienceYears ? `${l.applicationForm.experienceYears} Years` : prev.lastExperience
+            lastExperience: l.applicationForm?.experienceYears ? `${l.applicationForm.experienceYears}` : prev.lastExperience
           }));
+          if (l.photoUrl || l.applicationForm?.photoUrl) {
+            setPhotoPreview(l.photoUrl || l.applicationForm.photoUrl);
+          }
+          if (l.signatureUrl || l.applicationForm?.signatureUrl) {
+            setSignaturePreview(l.signatureUrl || l.applicationForm.signatureUrl);
+          }
         }
       } catch (err) {
         console.error('Error preloading lead details:', err);
@@ -122,29 +137,52 @@ export default function CandidateRegistrationForm() {
   };
 
   const handlePhotoUpload = (e) => {
+    e.stopPropagation();
     const file = e.target.files?.[0];
     if (file) {
-      const url = URL.createObjectURL(file);
-      setPhotoPreview(url);
-      updateField('candidatePhoto', file.name);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          setPhotoPreview(event.target.result);
+          updateField('candidatePhoto', file.name);
+        }
+      };
+      reader.onerror = () => {
+        showToast('Failed to read image file');
+      };
+      reader.readAsDataURL(file);
     }
+    // reset input so same file can be re-selected if removed
+    if (e.target) e.target.value = '';
   };
 
-  const handleRemovePhoto = () => {
+  const handleRemovePhoto = (e) => {
+    if (e && e.stopPropagation) e.stopPropagation();
     setPhotoPreview(null);
     updateField('candidatePhoto', null);
   };
 
   const handleSignatureUpload = (e) => {
+    e.stopPropagation();
     const file = e.target.files?.[0];
     if (file) {
-      const url = URL.createObjectURL(file);
-      setSignaturePreview(url);
-      updateField('candidateSignature', file.name);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          setSignaturePreview(event.target.result);
+          updateField('candidateSignature', file.name);
+        }
+      };
+      reader.onerror = () => {
+        showToast('Failed to read signature file');
+      };
+      reader.readAsDataURL(file);
     }
+    if (e.target) e.target.value = '';
   };
 
-  const handleRemoveSignature = () => {
+  const handleRemoveSignature = (e) => {
+    if (e && e.stopPropagation) e.stopPropagation();
     setSignaturePreview(null);
     updateField('candidateSignature', '');
   };
@@ -191,6 +229,31 @@ export default function CandidateRegistrationForm() {
         source: 'MANUAL',
         currentStage: form.routingOption === 'INTERVIEW' ? 'INITIAL_INTERVIEW' : 'MEDICAL_PROCESS',
         isPassportHolder: 'YES',
+        isFormFilled: true,
+        formFilledAt: new Date(),
+        applicationForm: {
+          trade: form.occupation.trim() || 'General Worker',
+          experienceYears: form.lastExperience || 'Fresher',
+          preferredCountries: [form.officeConfirmationCountry || 'Saudi Arabia'],
+          expectedSalary: form.newExpectedSalary || form.officeConfirmationSalary || 'Standard',
+          fatherName: form.fatherName.trim(),
+          dob: form.dob,
+          gender: 'Male',
+          altPhone: form.whatsappNo.trim() || form.contactNo.trim(),
+          address: form.address,
+          city: form.state || '',
+          state: form.state,
+          pinCode: form.pinCode,
+          passportIssueDate: form.passportIssue,
+          passportExpiry: form.passportExpiry,
+          nationality: form.nationality || 'Indian',
+          ecrStatus: form.ecrStatus || 'ECNR',
+          agentCode: form.agentCode,
+          medicalStatus: form.medicalReport,
+          pccStatus: form.pccStatus,
+          hasPhoto: Boolean(photoPreview),
+          hasSignature: Boolean(signaturePreview)
+        },
         notes: `Registered via Official Physical Form (${form.regNo}). ECR Status: ${form.ecrStatus}. Routing: ${form.routingOption}. Agent: ${form.agentCode || 'Direct'}.`
       };
 
@@ -836,19 +899,28 @@ export default function CandidateRegistrationForm() {
                   </div>
                 </div>
               ) : (
-                <label className="border-2 border-dashed border-gray-300 hover:border-blue-400 rounded-xl p-6 text-center bg-white flex flex-col items-center justify-center cursor-pointer transition-colors group">
+                <div 
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    photoInputRef.current?.click();
+                  }}
+                  className="border-2 border-dashed border-gray-300 hover:border-blue-400 rounded-xl p-6 text-center bg-white flex flex-col items-center justify-center cursor-pointer transition-colors group"
+                >
                   <div className="w-11 h-11 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mb-2 group-hover:scale-105 transition-transform">
                     <UploadCloud className="w-5 h-5" />
                   </div>
                   <span className="text-xs font-bold text-gray-800">Upload Passport Photo</span>
                   <span className="text-[11px] text-gray-400 mt-0.5">JPG, PNG up to 5MB</span>
                   <input
+                    ref={photoInputRef}
                     type="file"
                     accept="image/*"
+                    onClick={(e) => e.stopPropagation()}
                     onChange={handlePhotoUpload}
-                    className="sr-only"
+                    className="hidden"
                   />
-                </label>
+                </div>
               )}
             </div>
 
@@ -883,19 +955,28 @@ export default function CandidateRegistrationForm() {
                   </div>
                 </div>
               ) : (
-                <label className="border-2 border-dashed border-gray-300 hover:border-blue-400 rounded-xl p-6 text-center bg-white flex flex-col items-center justify-center cursor-pointer transition-colors group">
+                <div 
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    signatureInputRef.current?.click();
+                  }}
+                  className="border-2 border-dashed border-gray-300 hover:border-blue-400 rounded-xl p-6 text-center bg-white flex flex-col items-center justify-center cursor-pointer transition-colors group"
+                >
                   <div className="w-11 h-11 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mb-2 group-hover:scale-105 transition-transform">
                     <UploadCloud className="w-5 h-5" />
                   </div>
                   <span className="text-xs font-bold text-gray-800">Upload Signature Scan</span>
                   <span className="text-[11px] text-gray-400 mt-0.5">JPG, PNG scan file</span>
                   <input
+                    ref={signatureInputRef}
                     type="file"
                     accept="image/*"
+                    onClick={(e) => e.stopPropagation()}
                     onChange={handleSignatureUpload}
-                    className="sr-only"
+                    className="hidden"
                   />
-                </label>
+                </div>
               )}
             </div>
 

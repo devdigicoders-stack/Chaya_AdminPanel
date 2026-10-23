@@ -5,14 +5,15 @@ import {
   Clock, ShieldCheck, AlertTriangle, BarChart3, TrendingUp, Zap,
   Filter, Search, Eye, X, UserCheck, FileSpreadsheet, Globe,
   RefreshCw, Award, CalendarDays, Phone, MapPin, Briefcase,
-  Layers, CheckSquare, Square
+  Layers, CheckSquare, Square, Target
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import {
   apiGetLeads,
   apiGetUsers,
   apiAssignLeads,
-  apiDistributeRoundRobin
+  apiDistributeRoundRobin,
+  apiUpdateUserTargets
 } from '../../utils/api';
 
 const SOURCE_STYLE = {
@@ -48,6 +49,13 @@ export default function LeadAssignment() {
   const [searchQ, setSearchQ] = useState('');
   const [filterSource, setFilterSource] = useState('ALL');
   const [filterPassport, setFilterPassport] = useState('ALL');
+
+  // Staff Head Target Modal
+  const [targetStaffUser, setTargetStaffUser] = useState(null);
+  const [targetMedicals, setTargetMedicals] = useState(0);
+  const [targetAdvances, setTargetAdvances] = useState(0);
+  const [targetMovedFiles, setTargetMovedFiles] = useState(0);
+  const [targetSaving, setTargetSaving] = useState(false);
 
   // 1. Fetch live data from MongoDB Atlas
   const loadData = useCallback(async () => {
@@ -474,10 +482,24 @@ export default function LeadAssignment() {
                     <div className={`h-full ${barColor} rounded-full transition-all`} style={{ width: `${pct}%` }} />
                   </div>
 
-                  <div className="text-[11px] text-gray-500 flex justify-between font-medium">
+                  <div className="text-[11px] text-gray-500 flex justify-between font-medium mb-2">
                     <span>{staff.assigned} active leads</span>
                     <span className="text-gray-400">Cap: {staff.max}</span>
                   </div>
+
+                  <button
+                    onClick={() => {
+                      setTargetStaffUser(staff);
+                      const t = staff.monthlyTargets || {};
+                      setTargetMedicals(t.medicalsTarget || 0);
+                      setTargetAdvances(t.advancesTarget || 0);
+                      setTargetMovedFiles(t.movedFilesTarget || 0);
+                    }}
+                    className="w-full py-1.5 px-2 bg-white hover:bg-amber-50 text-amber-700 border border-amber-200 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1 transition-colors cursor-pointer shadow-2xs"
+                  >
+                    <Target className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Set Target</span>
+                  </button>
                 </div>
               );
             })}
@@ -903,6 +925,129 @@ export default function LeadAssignment() {
                 Close Drawer
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Staff Head Quick Target Modal */}
+      {targetStaffUser && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-gray-100 overflow-hidden">
+            <div className="p-6 bg-gradient-to-r from-amber-500 to-orange-600 text-white flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center">
+                  <Target className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-[16px] leading-tight">Assign Monthly Targets</h3>
+                  <p className="text-amber-100 text-[11px] font-medium">For Calling Staff: {targetStaffUser.name}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setTargetStaffUser(null)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4 text-white" />
+              </button>
+            </div>
+
+            <form 
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setTargetSaving(true);
+                try {
+                  await apiUpdateUserTargets(targetStaffUser._id || targetStaffUser.id, {
+                    medicalsTarget: targetMedicals,
+                    advancesTarget: targetAdvances,
+                    movedFilesTarget: targetMovedFiles
+                  });
+                  Swal.fire({
+                    icon: 'success',
+                    title: 'Target Assigned!',
+                    html: `Target for <b>${targetStaffUser.name}</b> has been updated and synced to their App.<br><span class="text-xs text-gray-500">Medicals: ${targetMedicals} • Advances: ${targetAdvances} • Moved Files: ${targetMovedFiles}</span>`,
+                    confirmButtonColor: '#2563EB'
+                  });
+                  setTargetStaffUser(null);
+                  loadData();
+                } catch (err) {
+                  Swal.fire({ icon: 'error', title: 'Error', text: err.message || 'Failed to update target' });
+                } finally {
+                  setTargetSaving(false);
+                }
+              }}
+              className="p-6 space-y-4"
+            >
+              <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-3 text-[11.5px] text-amber-900 flex items-start gap-2">
+                <Sparkles className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <span>Target assigned here syncs immediately to the calling staff's mobile screen.</span>
+              </div>
+
+              <div>
+                <label className="block text-[12px] font-bold text-gray-700 mb-1 flex justify-between">
+                  <span>1. Medicals Target</span>
+                  <span className="text-[11px] text-emerald-600 font-semibold">FIT Candidates</span>
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={targetMedicals}
+                  onChange={(e) => setTargetMedicals(e.target.value)}
+                  required
+                  placeholder="e.g. 15"
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[13px] font-bold text-gray-900 focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[12px] font-bold text-gray-700 mb-1 flex justify-between">
+                  <span>2. Advances Target</span>
+                  <span className="text-[11px] text-sky-600 font-semibold">Advance Collections</span>
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={targetAdvances}
+                  onChange={(e) => setTargetAdvances(e.target.value)}
+                  required
+                  placeholder="e.g. 10"
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[13px] font-bold text-gray-900 focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[12px] font-bold text-gray-700 mb-1 flex justify-between">
+                  <span>3. Moved Files Target</span>
+                  <span className="text-[11px] text-purple-600 font-semibold">Forwarded Files</span>
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={targetMovedFiles}
+                  onChange={(e) => setTargetMovedFiles(e.target.value)}
+                  required
+                  placeholder="e.g. 8"
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[13px] font-bold text-gray-900 focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setTargetStaffUser(null)}
+                  className="px-4 py-2 text-[12px] font-bold text-gray-600 hover:bg-gray-100 rounded-xl cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={targetSaving}
+                  className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-xl text-[12px] font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <Target className="w-4 h-4" />
+                  <span>{targetSaving ? 'Saving...' : 'Save & Sync Target'}</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

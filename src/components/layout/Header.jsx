@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Menu, Calendar, Bell, User, LogOut, ChevronDown, Shield } from 'lucide-react';
+import { Menu, Calendar, Bell, User, LogOut, ChevronDown, Shield, HelpCircle } from 'lucide-react';
 import { getCurrentUser, getFullAvatarUrl, clearAuth } from '../../utils/api';
 import { confirmLogoutAlert, showToast } from '../../utils/alerts';
+import EnquiryModal from './EnquiryModal';
 
-const Header = ({ onToggleSidebar }) => {
+const Header = ({ onToggleSidebar, onOpenEnquiryModal }) => {
   const navigate = useNavigate();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -59,6 +60,16 @@ const Header = ({ onToggleSidebar }) => {
           <Calendar className="w-3.5 h-3.5 text-blue-600" />
           <span>{new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', weekday: 'short' })}</span>
         </div>
+
+        {/* Raise / Received Enquiry Button for All Roles */}
+        <button
+          onClick={onOpenEnquiryModal}
+          className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-bold shadow-xs hover:shadow-md transition cursor-pointer"
+          title="Raise or View Received Enquiries"
+        >
+          <HelpCircle className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Enquiry Desk</span>
+        </button>
 
         {/* Notification Bell */}
         <button 

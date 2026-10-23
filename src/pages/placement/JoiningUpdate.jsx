@@ -1,3 +1,4 @@
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   ChevronRight, Plane, Calendar, Search, 
   X, CheckCircle2, 

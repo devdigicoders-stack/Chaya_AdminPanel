@@ -6,8 +6,8 @@ import {
   X, Globe, Phone, MapPin,
   FileSpreadsheet, Share2, Layers, AlertCircle, Sparkles,
   Trash2, Edit, PauseCircle, PlayCircle, History, Clock,
-  MessageCircle, Building2, UserPlus
-  } from 'lucide-react';
+  MessageCircle, Building2, UserPlus, Calendar
+} from 'lucide-react';
 import Swal from 'sweetalert2';
 import {
   apiGetLeads,
@@ -79,6 +79,8 @@ export default function Leads() {
   const [sourceFilter, setSourceFilter] = useState('ALL');
   const [holdFilter, setHoldFilter] = useState('ALL');
   const [intakeFilter, setIntakeFilter] = useState('ALL'); // 'ALL' | 'UNASSIGNED_INTAKE' | 'STAFF_HEAD_POOL'
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   // Selection & Staff Head Transfer States
   const [selectedLeadIds, setSelectedLeadIds] = useState([]);
@@ -127,6 +129,8 @@ export default function Leads() {
         isHold: holdFilter === 'HOLD' ? 'true' : holdFilter === 'ACTIVE' ? 'false' : undefined,
         unassignedIntake: intakeFilter === 'UNASSIGNED_INTAKE' ? 'true' : undefined,
         headQueue: intakeFilter === 'STAFF_HEAD_POOL' ? 'true' : undefined,
+        startDate: startDate ? startDate : undefined,
+        endDate: endDate ? endDate : undefined,
       });
 
       setLeads(res.data || []);
@@ -138,7 +142,7 @@ export default function Leads() {
     } finally {
       setLoading(false);
     }
-  }, [search, stageFilter, passportFilter, sourceFilter, holdFilter, intakeFilter]);
+  }, [search, stageFilter, passportFilter, sourceFilter, holdFilter, intakeFilter, startDate, endDate]);
 
   useEffect(() => {
     fetchLeads();
@@ -684,6 +688,43 @@ export default function Leads() {
               ))}
             </select>
           </div>
+        </div>
+
+        {/* Date / Time Range Filters */}
+        <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-gray-100 text-[12px]">
+          <span className="text-gray-500 font-bold flex items-center gap-1">
+            <Calendar className="w-3.5 h-3.5 text-blue-600" />
+            <span>Timeline Date Filter:</span>
+          </span>
+
+          <div className="flex items-center gap-1.5">
+            <span className="text-gray-400 text-xs">From:</span>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="px-2.5 py-1 text-xs border border-gray-200 rounded-lg bg-gray-50 text-gray-700 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+            />
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <span className="text-gray-400 text-xs">To:</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="px-2.5 py-1 text-xs border border-gray-200 rounded-lg bg-gray-50 text-gray-700 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+            />
+          </div>
+
+          {(startDate || endDate) && (
+            <button
+              onClick={() => { setStartDate(''); setEndDate(''); }}
+              className="text-xs text-rose-600 hover:text-rose-700 font-semibold px-2 py-0.5 hover:bg-rose-50 rounded cursor-pointer transition"
+            >
+              Clear Date Filter
+            </button>
+          )}
         </div>
 
         {/* Quick Filter Pill Badges */}

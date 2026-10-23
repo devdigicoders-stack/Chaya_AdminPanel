@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { 
   ArrowRightLeft, Inbox, Send, CheckCircle2, Clock, 
   RefreshCw, AlertCircle, Search, ChevronRight,
-  Check, X, Loader2
+  Check, X, Loader2, Mic, FileCheck2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
@@ -11,11 +11,14 @@ import {
   apiGetTransferOutbox, 
   apiAcceptTransfer, 
   apiReturnTransfer,
+  apiCancelTransfer,
   apiGetLeads,
   apiGetUsers,
   apiRequestTransfer
 } from '../../utils/api';
 import LeadHistoryModal from '../../components/leads/LeadHistoryModal';
+import ReceivingConfirmationModal from '../../components/leads/ReceivingConfirmationModal';
+import StaffHeadTransferModal from '../../components/leads/StaffHeadTransferModal';
 
 export default function TransferInboxPage() {
   const navigate = useNavigate();
@@ -26,6 +29,8 @@ export default function TransferInboxPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [actionLoadingId, setActionLoadingId] = useState(null);
   const [historyCandidate, setHistoryCandidate] = useState(null);
+  const [receivingModalLead, setReceivingModalLead] = useState(null);
+  const [staffHeadModalLead, setStaffHeadModalLead] = useState(null);
 
   // New Transfer Modal
   const [showNewTransferModal, setShowNewTransferModal] = useState(false);
@@ -123,42 +128,9 @@ export default function TransferInboxPage() {
     }
   };
 
-  // Accept Transfer Action
-  const handleAccept = async (lead) => {
-    const confirm = await Swal.fire({
-      title: 'Accept File Responsibility?',
-      html: `You are about to accept file for <b>${lead.candidateName}</b> from <b>${lead.pendingTransfer?.fromUserName || 'Previous Staff'}</b>.<br><br>
-             <span class="text-xs text-blue-700 bg-blue-50 p-2 rounded block">
-             Per FRD Section 1 & 7: You will become the sole Active File Holder and assume full handling responsibility.
-             </span>`,
-      icon: 'question',
-      showCancelButton: true,
-      confirmButtonText: 'Yes, Accept File',
-      confirmButtonColor: '#10B981',
-      cancelButtonColor: '#64748B'
-    });
-
-    if (!confirm.isConfirmed) return;
-
-    setActionLoadingId(lead._id);
-    try {
-      const res = await apiAcceptTransfer(lead._id);
-      if (res?.success) {
-        Swal.fire({
-          icon: 'success',
-          title: 'File Accepted!',
-          text: `You are now the active file holder for ${lead.candidateName}.`,
-          confirmButtonColor: '#10B981'
-        });
-        loadTransfers();
-      } else {
-        Swal.fire({ icon: 'error', title: 'Error', text: res?.message, confirmButtonColor: '#EF4444' });
-      }
-    } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Failed', text: err.message, confirmButtonColor: '#EF4444' });
-    } finally {
-      setActionLoadingId(null);
-    }
+  // Accept Transfer Action (Opens Step 9 Receiving Confirmation Modal)
+  const handleAccept = (lead) => {
+    setReceivingModalLead(lead);
   };
 
   // Return Transfer Action
@@ -185,6 +157,43 @@ export default function TransferInboxPage() {
           icon: 'info',
           title: 'File Returned',
           text: `File has been returned to ${lead.pendingTransfer?.fromUserName}.`,
+          confirmButtonColor: '#2563EB'
+        });
+        loadTransfers();
+      } else {
+        Swal.fire({ icon: 'error', title: 'Error', text: res?.message, confirmButtonColor: '#EF4444' });
+      }
+    } catch (err) {
+      Swal.fire({ icon: 'error', title: 'Failed', text: err.message, confirmButtonColor: '#EF4444' });
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  // Cancel Transfer Action (Calling staff / sender can revert, or Staff Head can cancel)
+  const handleCancelTransfer = async (lead) => {
+    const { value: reason } = await Swal.fire({
+      title: 'Cancel File Transfer?',
+      html: `Revert pending transfer for <b>${lead.candidateName}</b>?<br><span class="text-xs text-gray-500">The file transfer request will be cancelled immediately and file will remain with original staff.</span>`,
+      input: 'text',
+      inputPlaceholder: 'Optional cancellation remarks...',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, Cancel Transfer',
+      confirmButtonColor: '#EF4444',
+      cancelButtonColor: '#64748B'
+    });
+
+    if (reason === undefined) return;
+
+    setActionLoadingId(lead._id);
+    try {
+      const res = await apiCancelTransfer(lead._id, reason);
+      if (res?.success) {
+        Swal.fire({
+          icon: 'success',
+          title: 'Transfer Cancelled',
+          text: res.message || 'The file transfer has been reverted.',
           confirmButtonColor: '#2563EB'
         });
         loadTransfers();
@@ -442,6 +451,15 @@ export default function TransferInboxPage() {
                             </button>
 
                             <button
+                              onClick={() => handleCancelTransfer(lead)}
+                              disabled={isActionBusy}
+                              className="h-8 px-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                              title="Cancel / Revert transfer immediately"
+                            >
+                              <span>Cancel</span>
+                            </button>
+
+                            <button
                               onClick={() => setHistoryCandidate(lead)}
                               className="h-8 w-8 border border-gray-200 hover:bg-gray-50 text-gray-600 rounded-lg flex items-center justify-center transition-colors cursor-pointer"
                               title="View History Trail"
@@ -451,10 +469,43 @@ export default function TransferInboxPage() {
                           </div>
                         ) : (
                           <div className="flex items-center justify-center gap-2">
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                              <Clock className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
-                              <span>Awaiting {pt.toUserName || pt.toRole}</span>
-                            </span>
+                            {lead.fileTransferDetails?.status === 'RECEIVED_AND_CONFIRMED' ? (
+                              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>Received by {lead.fileTransferDetails.receivedByName || pt.toUserName}</span>
+                              </span>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                  <Clock className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
+                                  <span>Awaiting {pt.toUserName || pt.toRole}</span>
+                                </span>
+
+                                <button
+                                  onClick={() => handleCancelTransfer(lead)}
+                                  disabled={isActionBusy}
+                                  className="h-7 px-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                                  title="Cancel / Revert this pending transfer"
+                                >
+                                  <X className="w-3 h-3" />
+                                  <span>Cancel</span>
+                                </button>
+                              </div>
+                            )}
+
+                            {lead.fileTransferDetails?.recordingUrl && (
+                              <a
+                                href={lead.fileTransferDetails.recordingUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="h-8 px-2.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-lg text-xs font-bold flex items-center gap-1 transition"
+                                title="Listen to Receiving Call Recording"
+                              >
+                                <Mic className="w-3.5 h-3.5 text-purple-600" />
+                                <span>Recording</span>
+                              </a>
+                            )}
+
                             <button
                               onClick={() => setHistoryCandidate(lead)}
                               className="h-8 w-8 border border-gray-200 hover:bg-gray-50 text-gray-600 rounded-lg flex items-center justify-center transition-colors cursor-pointer"
@@ -588,6 +639,23 @@ export default function TransferInboxPage() {
         isOpen={!!historyCandidate}
         onClose={() => setHistoryCandidate(null)}
         candidate={historyCandidate}
+      />
+
+      {/* 7. Receiving Confirmation & Handover Modal */}
+      <ReceivingConfirmationModal
+        isOpen={Boolean(receivingModalLead)}
+        lead={receivingModalLead}
+        onClose={() => setReceivingModalLead(null)}
+        onUpdated={loadTransfers}
+      />
+
+      {/* 8. Staff Head File Transfer Modal */}
+      <StaffHeadTransferModal
+        isOpen={Boolean(staffHeadModalLead)}
+        lead={staffHeadModalLead}
+        onClose={() => setStaffHeadModalLead(null)}
+        onUpdated={loadTransfers}
+        onOpenAdvanceDesk={() => navigate('/billing/advance')}
       />
     </div>
   );

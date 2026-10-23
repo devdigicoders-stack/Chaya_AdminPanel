@@ -157,6 +157,14 @@ export const apiUpdateProfile = async (formData) => {
   return data.data;
 };
 
+// 4.1 Update User Monthly Targets (ADMIN / STAFF_HEAD)
+export const apiUpdateUserTargets = async (userId, targetData) => {
+  return authFetch(`/auth/users/${userId}/targets`, {
+    method: 'PUT',
+    body: JSON.stringify(targetData)
+  });
+};
+
 // 5. Change Password
 export const apiChangePassword = async (currentPassword, newPassword) => {
   const token = getAuthToken();
@@ -280,11 +288,11 @@ export const apiToggleLeadHold = async (id, isHold, reason = '') => {
   });
 };
 
-// 8. Categorize lead (Passport Holder / Non-Passport / Not Confirmed)
-export const apiCategorizeLead = async (id, { isPassportHolder, phone, passportNumber }) => {
+// 8. Categorize lead (Passport Holder / Non-Passport / Not Confirmed / Not Interested)
+export const apiCategorizeLead = async (id, data) => {
   return authFetch(`/leads/${id}/categorize`, {
     method: 'PUT',
-    body: JSON.stringify({ isPassportHolder, phone, passportNumber })
+    body: JSON.stringify(data)
   });
 };
 
@@ -600,9 +608,10 @@ export const apiRequestTransfer = async (id, transferData) => {
   });
 };
 
-export const apiAcceptTransfer = async (id) => {
+export const apiAcceptTransfer = async (id, payload = {}) => {
   return authFetch(`/leads/${id}/accept-transfer`, {
-    method: 'POST'
+    method: 'POST',
+    body: JSON.stringify(payload)
   });
 };
 
@@ -610,6 +619,29 @@ export const apiReturnTransfer = async (id, reason) => {
   return authFetch(`/leads/${id}/return-transfer`, {
     method: 'POST',
     body: JSON.stringify({ reason })
+  });
+};
+
+export const apiCancelTransfer = async (id, reason = '') => {
+  return authFetch(`/leads/${id}/cancel-transfer`, {
+    method: 'POST',
+    body: JSON.stringify({ reason })
+  });
+};
+
+// Step 9: Staff Head File Transfer with Mandatory Instructions & Step 8 Advance Gate
+export const apiInitiateStaffHeadTransfer = async (id, transferData) => {
+  return authFetch(`/leads/${id}/staff-head-transfer`, {
+    method: 'POST',
+    body: JSON.stringify(transferData)
+  });
+};
+
+// Step 9: Receiving Staff Confirms File Transfer & Takes Full Ownership
+export const apiConfirmReceivingTransfer = async (id, confirmationData) => {
+  return authFetch(`/leads/${id}/confirm-receiving`, {
+    method: 'POST',
+    body: JSON.stringify(confirmationData)
   });
 };
 
@@ -765,7 +797,35 @@ export const apiSendMedicalReportPdf = async (id, payload = {}) => {
   });
 };
 
+// 47. Raise & Received Enquiry System across all roles
+export const apiRaiseEnquiry = async (enquiryData) => {
+  return authFetch('/enquiries', {
+    method: 'POST',
+    body: JSON.stringify(enquiryData)
+  });
+};
 
+export const apiGetEnquiries = async (params = {}) => {
+  const query = new URLSearchParams(
+    Object.entries(params).filter(([_, v]) => v !== undefined && v !== null && v !== '')
+  ).toString();
+  return authFetch(`/enquiries${query ? `?${query}` : ''}`);
+};
 
+export const apiRespondToEnquiry = async (id, responseData) => {
+  return authFetch(`/enquiries/${id}/respond`, {
+    method: 'POST',
+    body: JSON.stringify(responseData)
+  });
+};
 
+export const apiConvertEnquiryToLead = async (id) => {
+  return authFetch(`/enquiries/${id}/convert-to-lead`, {
+    method: 'POST'
+  });
+};
 
+// 48. Calling Pipeline Summary (Exact 10 Stages + Monthly Progress)
+export const apiGetCallingPipelineSummary = async () => {
+  return authFetch('/leads/calling/pipeline-summary');
+};

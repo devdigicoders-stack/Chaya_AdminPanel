@@ -3,7 +3,8 @@ import {
   ChevronRight, Banknote, Receipt, CheckCircle2, Search, 
   RefreshCw, Loader2, DollarSign, AlertCircle, 
   CreditCard, Eye, Printer, X, Check, ShieldCheck,
-  AlertTriangle, ExternalLink, Volume2, FileCheck2, MessageCircle, Download, Building2, Clock
+  AlertTriangle, ExternalLink, Volume2, FileCheck2, MessageCircle, Download, Building2, Clock,
+  Send
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
@@ -11,6 +12,7 @@ import { apiGetLeads, apiRecordPaymentBooking, apiSendMedicalReportPdf, apiVerif
 import { generateInvoicePdf, printInvoiceReceipt } from '../../utils/invoicePdfGenerator';
 import BillBookModal from '../../components/billing/BillBookModal';
 import CompanyConfirmationModal from '../../components/leads/CompanyConfirmationModal';
+import StaffHeadTransferModal from '../../components/leads/StaffHeadTransferModal';
 
 export default function AdvanceCollection() {
   const navigate = useNavigate();
@@ -30,6 +32,7 @@ export default function AdvanceCollection() {
   const [viewReceiptModal, setViewReceiptModal] = useState(null);
   const [billBookCandidate, setBillBookCandidate] = useState(null);
   const [companyConfCandidate, setCompanyConfCandidate] = useState(null);
+  const [staffHeadTransferCandidate, setStaffHeadTransferCandidate] = useState(null);
   const [formValues, setFormValues] = useState({
     servicePaid: '5000',
     medicalPaid: '2500',
@@ -587,6 +590,7 @@ export default function AdvanceCollection() {
                   const pendingAmount = pendingTxs.reduce((s, t) => s + (Number(t.amount) || 0), 0) || Number(bb.pendingVerification || p.pendingAdvance || 0);
                   const hasPendingTx = pendingTxs.length > 0 || pendingAmount > 0;
                   const latestPendingTx = pendingTxs[pendingTxs.length - 1];
+                  const isPaid = advanceVerified > 0 || Boolean(p.afterAdvanceConfirmed);
 
                   return (
                     <tr key={candidate._id} className="hover:bg-purple-50/30 transition-colors">
@@ -719,6 +723,31 @@ export default function AdvanceCollection() {
                           >
                             <Building2 className="w-3.5 h-3.5" />
                             <span>Company</span>
+                          </button>
+
+                          {/* Staff Head File Transfer Action */}
+                          <button
+                            onClick={() => {
+                              if (advanceVerified > 0 || p.afterAdvanceConfirmed) {
+                                setStaffHeadTransferCandidate(candidate);
+                              } else {
+                                Swal.fire({
+                                  icon: 'warning',
+                                  title: 'Advance Verification Required',
+                                  text: 'Niyam ke anushar file transfer karne se pehle Step 8 advance payment confirm aur verify hona aniwarya hai.',
+                                  confirmButtonColor: '#7C3AED'
+                                });
+                              }
+                            }}
+                            className={`h-7 px-2 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer shadow-xs ${
+                              advanceVerified > 0 || p.afterAdvanceConfirmed
+                                ? 'bg-purple-600 hover:bg-purple-700 text-white'
+                                : 'bg-gray-100 hover:bg-gray-200 text-gray-400'
+                            }`}
+                            title="Staff Head Ke Nirdesh Par File Transfer"
+                          >
+                            <Send className="w-3.5 h-3.5 text-amber-300" />
+                            <span>Transfer</span>
                           </button>
 
                           {/* View Receipt & Print/Download & WhatsApp */}
@@ -1234,6 +1263,15 @@ export default function AdvanceCollection() {
             setPayModal(null);
           }
         }}
+      />
+
+      {/* Staff Head File Transfer Modal */}
+      <StaffHeadTransferModal
+        isOpen={Boolean(staffHeadTransferCandidate)}
+        lead={staffHeadTransferCandidate}
+        onClose={() => setStaffHeadTransferCandidate(null)}
+        onUpdated={fetchAdvanceQueue}
+        onOpenAdvanceDesk={(l) => setBillBookCandidate(l)}
       />
 
     </div>

@@ -216,18 +216,18 @@ export default function Dashboard() {
     return recentLogs.slice(start, start + activityPageSize);
   }, [recentLogs, activityPage, activityPageSize]);
 
-  // 10 Major Workflow Checkpoints (Direct Navigation with live counts)
+  // 10 Major Workflow Checkpoints (Direct Navigation matching Mobile App 10-step Client Pipeline)
   const workflowCheckpoints = useMemo(() => [
-    { step: 'Step 01', label: 'Lead Pool', count: `${summary.totalLeads} Leads`, path: '/leads', color: 'bg-blue-50 text-blue-700 border-blue-200' },
-    { step: 'Step 02', label: 'Staff Head Desk', count: `${summary.byStage?.STAFF_HEAD_HANDLING || 0} Files`, path: '/staff-head/assign', color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
-    { step: 'Step 03', label: 'Calling Desk', count: `${summary.byStage?.CALLING_SCREENING || 0} Files`, path: '/calling/queue', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-    { step: 'Step 04', label: 'Interview Panel', count: `${summary.byStage?.INITIAL_INTERVIEW || 0} Files`, path: '/interview/initial', color: 'bg-amber-50 text-amber-700 border-amber-200' },
-    { step: 'Step 05', label: 'Medical Checkup', count: `${summary.byStage?.MEDICAL_PROCESS || 0} Cases`, path: '/medical/all', color: 'bg-teal-50 text-teal-700 border-teal-200' },
-    { step: 'Step 06', label: 'Bill Book Accounts', count: `${summary.financials?.fullPaidCount || 0} Paid`, path: '/billing/advance', color: 'bg-amber-100 text-amber-900 border-amber-300' },
-    { step: 'Step 07', label: 'Pre-Viva Review', count: `${summary.byStage?.PRE_VISA || 0} Files`, path: '/pre-viva/all', color: 'bg-purple-50 text-purple-700 border-purple-200' },
-    { step: 'Step 08', label: 'Visa Consulate', count: `${summary.byStage?.VISA_PROCESSING || 0} Visas`, path: '/visa/apply', color: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
-    { step: 'Step 09', label: 'Client Final Viva', count: `${summary.byStage?.VIVA_PLACEMENT || 0} Scores`, path: '/placement/schedule', color: 'bg-purple-100 text-purple-800 border-purple-300' },
-    { step: 'Step 10', label: 'Flight & Joined', count: `${summary.byStage?.COMPLETED || 0} Flights`, path: '/placement/joining', color: 'bg-rose-50 text-rose-700 border-rose-200' },
+    { step: '01', label: 'Received Data', count: `${summary.totalLeads} Leads`, path: '/calling/queue?stage=01', color: 'bg-blue-50 text-blue-700 border-blue-200' },
+    { step: '02', label: 'Interested', count: `${(summary.byPassport?.YES || 0) + (summary.byPassport?.NO || 0)} Leads`, path: '/calling/queue?stage=02', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+    { step: '03', label: 'Passport Holders', count: `${summary.byPassport?.YES || 0} Passports`, path: '/calling/queue?stage=03', color: 'bg-teal-50 text-teal-700 border-teal-200' },
+    { step: '04', label: 'Form Filling', count: `${summary.byStage?.CALLING_SCREENING || 0} Forms`, path: '/calling/queue?stage=04', color: 'bg-amber-50 text-amber-700 border-amber-200' },
+    { step: '05', label: 'Interview / CV', count: `${(summary.byStage?.INITIAL_INTERVIEW || 0) + (summary.byStage?.FINAL_INTERVIEW || 0)} Files`, path: '/calling/queue?stage=05', color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+    { step: '06', label: 'My Selections', count: `${(summary.interviewSummary?.passed || 0) + (summary.byStage?.MEDICAL_PROCESS || 0)} Selected`, path: '/calling/queue?stage=06', color: 'bg-violet-50 text-violet-700 border-violet-200' },
+    { step: '07', label: 'My Medicals', count: `${summary.byStage?.MEDICAL_PROCESS || 0} Medicals`, path: '/calling/queue?stage=07', color: 'bg-sky-50 text-sky-700 border-sky-200' },
+    { step: '08', label: 'HR Confirmation', count: `${summary.byStage?.COMPANY_CONFIRMATION || 0} Offers`, path: '/calling/queue?stage=08', color: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
+    { step: '09', label: 'Pending Advance', count: `${summary.financials?.unpaidCount || 0} Pending`, path: '/calling/queue?stage=09', color: 'bg-amber-100 text-amber-900 border-amber-300' },
+    { step: '10', label: 'Advance Collected', count: `${summary.financials?.fullPaidCount || 0} Advances`, path: '/calling/queue?stage=10', color: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
   ], [summary]);
 
   // Export Dashboard Summary to CSV

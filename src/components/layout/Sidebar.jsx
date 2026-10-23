@@ -102,12 +102,22 @@ const Sidebar = ({ isOpen = false, onClose = () => {} }) => {
       ]
     },
     { 
-      name: '03. Calling & Screening', 
+      name: '03. Calling & Client Pipeline', 
       icon: PhoneCall, 
       path: '/calling/queue',
       subItems: [
-        { name: 'Calling List & Passport Check', path: '/calling/queue' },
-        { name: 'Interested Country', path: '/calling/location-confirm' },
+        { name: '10-Step Client Pipeline', path: '/calling/queue' },
+        { name: '01. Received Data (New / Not Int.)', path: '/calling/queue?stage=01' },
+        { name: '02. Interested (Passport / No Pass)', path: '/calling/queue?stage=02' },
+        { name: '03. Passport Holders Desk', path: '/calling/queue?stage=03' },
+        { name: '04. Form Filling (Incomplete/Done)', path: '/calling/queue?stage=04' },
+        { name: '05. Interview & CV Selection', path: '/calling/queue?stage=05' },
+        { name: '06. My Selections Desk', path: '/calling/queue?stage=06' },
+        { name: '07. My Medicals (Pending/Fit)', path: '/calling/queue?stage=07' },
+        { name: '08. HR Confirmation (Offer Letter)', path: '/calling/queue?stage=08' },
+        { name: '09. Pending Advance Desk', path: '/calling/queue?stage=09' },
+        { name: '10. Advance Collected & Handover', path: '/calling/queue?stage=10' },
+        { name: 'Interested Country Location', path: '/calling/location-confirm' },
       ]
     },
     { 

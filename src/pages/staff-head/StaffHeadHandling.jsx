@@ -18,6 +18,7 @@ import {
   apiTransferLeadStage,
   apiGetLeadById
 } from '../../utils/api';
+import StaffHeadTransferModal from '../../components/leads/StaffHeadTransferModal';
 
 const STAGE_FILTERS = [
   { value: 'ALL', label: 'All Handled Files' },
@@ -59,6 +60,8 @@ export default function StaffHeadHandling() {
   const [forwardModal, setForwardModal] = useState(null); // Candidate to forward
   const [forwardTargetStage, setForwardTargetStage] = useState('CALLING_SCREENING');
   const [forwardRemarks, setForwardRemarks] = useState('');
+
+  const [staffHeadTransferModal, setStaffHeadTransferModal] = useState(null); // Step 9 Staff Head File Transfer
 
   const [detailCandidate, setDetailCandidate] = useState(null); // Full detail drawer
   const [detailLoading, setDetailLoading] = useState(false);
@@ -842,6 +845,16 @@ export default function StaffHeadHandling() {
                             <span>Forward</span>
                           </button>
 
+                          {/* Step 9 Staff Head File Transfer with Advance Gate & Instructions */}
+                          <button
+                            onClick={() => setStaffHeadTransferModal(candidate)}
+                            className="px-2.5 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl text-[11.5px] font-bold cursor-pointer transition-all shadow-2xs inline-flex items-center gap-1"
+                            title="Staff Head ke nirdesh par file transfer"
+                          >
+                            <Send className="w-3 h-3 text-amber-300" />
+                            <span>Transfer File</span>
+                          </button>
+
                           {/* Hold / Resume */}
                           <button
                             onClick={() => handleToggleHold(candidate)}
@@ -1342,6 +1355,15 @@ export default function StaffHeadHandling() {
           </div>
         </div>
       )}
+
+      {/* Step 9 Staff Head File Transfer Modal */}
+      <StaffHeadTransferModal
+        isOpen={Boolean(staffHeadTransferModal)}
+        lead={staffHeadTransferModal}
+        onClose={() => setStaffHeadTransferModal(null)}
+        onUpdated={loadData}
+        onOpenAdvanceDesk={() => navigate('/billing/advance')}
+      />
 
     </div>
   );
