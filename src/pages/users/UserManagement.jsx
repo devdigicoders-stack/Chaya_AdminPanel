@@ -66,6 +66,10 @@ export default function UserManagement() {
   const [targetMedicals, setTargetMedicals] = useState(0);
   const [targetAdvances, setTargetAdvances] = useState(0);
   const [targetMovedFiles, setTargetMovedFiles] = useState(0);
+  const [targetLeadIntake, setTargetLeadIntake] = useState(0);
+  const [targetInterviews, setTargetInterviews] = useState(0);
+  const [targetVisas, setTargetVisas] = useState(0);
+  const [targetCustom, setTargetCustom] = useState(0);
   const [targetSaving, setTargetSaving] = useState(false);
 
   // Form State for Add User
@@ -237,6 +241,10 @@ export default function UserManagement() {
     setTargetMedicals(existingTargets.medicalsTarget || 0);
     setTargetAdvances(existingTargets.advancesTarget || 0);
     setTargetMovedFiles(existingTargets.movedFilesTarget || 0);
+    setTargetLeadIntake(existingTargets.leadIntakeTarget || 0);
+    setTargetInterviews(existingTargets.interviewsTarget || 0);
+    setTargetVisas(existingTargets.visasTarget || 0);
+    setTargetCustom(existingTargets.customTarget || 0);
   };
 
   const handleSaveTargets = async (e) => {
@@ -247,14 +255,18 @@ export default function UserManagement() {
       await apiUpdateUserTargets(targetModalUser._id, {
         medicalsTarget: targetMedicals,
         advancesTarget: targetAdvances,
-        movedFilesTarget: targetMovedFiles
+        movedFilesTarget: targetMovedFiles,
+        leadIntakeTarget: targetLeadIntake,
+        interviewsTarget: targetInterviews,
+        visasTarget: targetVisas,
+        customTarget: targetCustom
       });
 
       Swal.fire({
         icon: 'success',
         title: 'Monthly Targets Assigned!',
-        html: `Targets for <b>${targetModalUser.name}</b> have been saved and synced directly to their Mobile App.<br><br>
-        <span class="text-xs text-gray-500">Medicals: ${targetMedicals} • Advances: ${targetAdvances} • Moved Files: ${targetMovedFiles}</span>`,
+        html: `Targets for <b>${targetModalUser.name}</b> (${targetModalUser.role}) have been successfully saved and synced live to their dashboard.<br><br>
+        <span class="text-xs text-gray-500">Medicals: ${targetMedicals} • Advances: ${targetAdvances} • Moved Files: ${targetMovedFiles} • Intake: ${targetLeadIntake} • Interviews: ${targetInterviews} • Visas: ${targetVisas}</span>`,
         confirmButtonColor: '#2563EB'
       });
 
@@ -828,11 +840,11 @@ export default function UserManagement() {
                             <Eye className="w-4 h-4" />
                           </button>
 
-                          {user.role === 'CALLING_STAFF' && (
+                          {user.role !== 'ADMIN' && (
                             <button
                               onClick={() => handleOpenTargetModal(user)}
                               className="p-1.5 rounded-lg text-gray-500 hover:text-amber-600 hover:bg-amber-50 transition-colors cursor-pointer"
-                              title="Set Monthly Targets (Medicals, Advances, Moved Files)"
+                              title={`Set Monthly Targets for ${user.role}`}
                             >
                               <Target className="w-4 h-4 text-amber-600" />
                             </button>
@@ -1573,7 +1585,7 @@ export default function UserManagement() {
                 </div>
                 <div>
                   <h3 className="font-extrabold text-[16px] leading-tight">Assign Monthly Targets</h3>
-                  <p className="text-amber-100 text-[11px] font-medium">For Calling Staff: {targetModalUser.name}</p>
+                  <p className="text-amber-100 text-[11px] font-medium">Role: {targetModalUser.role?.replace(/_/g, ' ')} • {targetModalUser.name}</p>
                 </div>
               </div>
               <button 
@@ -1585,13 +1597,34 @@ export default function UserManagement() {
             </div>
 
             {/* Modal Form */}
-            <form onSubmit={handleSaveTargets} className="p-6 space-y-4">
+            <form onSubmit={handleSaveTargets} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
               <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-3.5 text-[11.5px] text-amber-900 leading-relaxed flex items-start gap-2.5">
                 <Sparkles className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                 <span>
-                  Targets assigned here sync live to <b>{targetModalUser.name}</b>'s mobile app dashboard under <b>"My Monthly Progress"</b>.
+                  Targets assigned here sync live to <b>{targetModalUser.name}</b>'s app dashboard and performance KPI cards for role <b>{targetModalUser.role}</b>.
                 </span>
               </div>
+
+              {/* Staff Head or Data Controller: Lead Intake Target */}
+              {(targetModalUser.role === 'STAFF_HEAD' || targetModalUser.role === 'DATA_CONTROLLER') && (
+                <div>
+                  <label className="block text-[12px] font-bold text-gray-700 mb-1 flex items-center justify-between">
+                    <span>Monthly Lead Intake / Allocation Target</span>
+                    <span className="text-[11px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">Leads Assigned</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min="0"
+                      value={targetLeadIntake}
+                      onChange={(e) => setTargetLeadIntake(e.target.value)}
+                      placeholder="e.g. 4000"
+                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[13px] font-bold text-gray-900 focus:outline-none focus:border-amber-500 focus:bg-white transition-colors"
+                    />
+                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[11px] font-bold text-gray-400">Leads</span>
+                  </div>
+                </div>
+              )}
 
               {/* Medicals Target */}
               <div>
@@ -1652,6 +1685,48 @@ export default function UserManagement() {
                   <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[11px] font-bold text-gray-400">Files</span>
                 </div>
               </div>
+
+              {/* Interview Panel Target */}
+              {(targetModalUser.role === 'INTERVIEW_PANEL' || targetModalUser.role === 'STAFF_HEAD') && (
+                <div>
+                  <label className="block text-[12px] font-bold text-gray-700 mb-1 flex items-center justify-between">
+                    <span>4. Interviews Target</span>
+                    <span className="text-[11px] font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">Trade Tests / Interviews</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min="0"
+                      value={targetInterviews}
+                      onChange={(e) => setTargetInterviews(e.target.value)}
+                      placeholder="e.g. 25"
+                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[13px] font-bold text-gray-900 focus:outline-none focus:border-amber-500 focus:bg-white transition-colors"
+                    />
+                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[11px] font-bold text-gray-400">Interviews</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Visa Manager / Pre-Visa Target */}
+              {(targetModalUser.role === 'VISA_MANAGER' || targetModalUser.role === 'PRE_VISA_MANAGER' || targetModalUser.role === 'STAFF_HEAD') && (
+                <div>
+                  <label className="block text-[12px] font-bold text-gray-700 mb-1 flex items-center justify-between">
+                    <span>5. Visas Target</span>
+                    <span className="text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">Visas Received</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min="0"
+                      value={targetVisas}
+                      onChange={(e) => setTargetVisas(e.target.value)}
+                      placeholder="e.g. 20"
+                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[13px] font-bold text-gray-900 focus:outline-none focus:border-amber-500 focus:bg-white transition-colors"
+                    />
+                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[11px] font-bold text-gray-400">Visas</span>
+                  </div>
+                </div>
+              )}
 
               {/* Action Buttons */}
               <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-gray-100">
