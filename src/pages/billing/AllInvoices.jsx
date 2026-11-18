@@ -1,24 +1,32 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   ChevronRight, Download, FileText, Banknote, Hourglass, 
   AlertCircle, CreditCard, CheckCircle2, Clock,
   Search, RefreshCw, Loader2, Eye, Receipt, Printer, X, Check,
-  ShieldCheck, AlertTriangle, ExternalLink, Volume2, FileCheck2, MessageCircle
+  ShieldCheck, AlertTriangle, ExternalLink, Volume2, FileCheck2, MessageCircle,
+  Upload, FileSpreadsheet, XCircle
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
-import { apiGetLeads, apiRecordPaymentBooking, apiRecordFinalPayment, apiSendMedicalReportPdf } from '../../utils/api';
+import * as XLSX from 'xlsx';
+import { apiGetLeads, apiRecordPaymentBooking, apiRecordFinalPayment, apiSendMedicalReportPdf, apiBulkImportBillBookTransactions } from '../../utils/api';
 import BillBookModal from '../../components/billing/BillBookModal';
 import { generateInvoicePdf, printInvoiceReceipt } from '../../utils/invoicePdfGenerator';
 
 export default function AllInvoices() {
   const navigate = useNavigate();
+  const fileInputRef = useRef(null);
 
   // State
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState(null);
   const [error, setError] = useState('');
+
+  // Bulk Payment Import Modal State
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
+  const [bulkUploading, setBulkUploading] = useState(false);
+  const [bulkResult, setBulkResult] = useState(null);
 
   // Filters & Search
   const [searchTerm, setSearchTerm] = useState('');
@@ -227,6 +235,193 @@ export default function AllInvoices() {
     }
   };
 
+  // 1. Download Payments Excel Template (.xlsx)
+  const handleDownloadBillingTemplate = () => {
+    const data = [
+      {
+        'Candidate ID / Mobile / Passport': 'CHY-1002',
+        'Candidate Name': 'Vikram Singh Rawat',
+        'Amount': 5000,
+        'Payment Type (ADVANCE / MEDICAL_FEE / SERVICE_CHARGE / FINAL_SETTLEMENT)': 'ADVANCE',
+        'Payment Mode (UPI / CASH / BANK_TRANSFER / CHEQUE)': 'UPI',
+        'Reference / UTR / Receipt No': 'UPI-77829104',
+        'Transaction Date (YYYY-MM-DD)': '2026-11-20',
+        'Remarks': 'Advance payment for UAE welder profile'
+      },
+      {
+        'Candidate ID / Mobile / Passport': '9123456789',
+        'Candidate Name': 'Sandeep Kumar',
+        'Amount': 2500,
+        'Payment Type (ADVANCE / MEDICAL_FEE / SERVICE_CHARGE / FINAL_SETTLEMENT)': 'MEDICAL_FEE',
+        'Payment Mode (UPI / CASH / BANK_TRANSFER / CHEQUE)': 'CASH',
+        'Reference / UTR / Receipt No': 'CASH-REC-1044',
+        'Transaction Date (YYYY-MM-DD)': '2026-11-20',
+        'Remarks': 'GAMCA lab medical fees'
+      }
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    worksheet['!cols'] = [
+      { wch: 32 }, { wch: 22 }, { wch: 14 }, { wch: 35 },
+      { wch: 24 }, { wch: 26 }, { wch: 24 }, { wch: 38 }
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Payment_Import_Template');
+    XLSX.writeFile(workbook, 'billing_transactions_import_template.xlsx');
+  };
+
+  // 2. Export Current Ledger to Excel (.xlsx)
+  const handleExportBillingExcel = () => {
+    if (filteredLeads.length === 0) {
+      Swal.fire('No Data', 'No billing records to export.', 'info');
+      return;
+    }
+
+    const data = filteredLeads.map(l => {
+      const p = l.paymentDetails || {};
+      const sFee = Number(p.serviceFee) || 9500;
+      const mFee = Number(p.medicalFee) || 2500;
+      const totalBilled = sFee + mFee;
+      const totalPaid = Number(p.totalPaid || p.advancePaid || (p.servicePaid || 0) + (p.medicalPaid || 0));
+      const balance = Math.max(0, totalBilled - totalPaid);
+      const status = balance === 0 && totalPaid > 0 ? 'Settled' : totalPaid > 0 ? 'Partially Paid' : 'Open';
+
+      return {
+        'Lead ID': l.leadId || l._id,
+        'Candidate Name': l.candidateName || '',
+        'Phone Number': l.phone || '',
+        'Passport Number': l.passportNumber || '',
+        'Trade Skill': l.trade || '',
+        'Country': l.country || '',
+        'Service Fee (₹)': sFee,
+        'Medical Fee (₹)': mFee,
+        'Total Invoiced (₹)': totalBilled,
+        'Total Collected (₹)': totalPaid,
+        'Balance Due (₹)': balance,
+        'Account Status': status,
+        'Latest Receipt No': p.receiptNo || '',
+        'Total Transactions': (l.billBook?.transactions || []).length
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    worksheet['!cols'] = [
+      { wch: 16 }, { wch: 22 }, { wch: 16 }, { wch: 18 },
+      { wch: 20 }, { wch: 16 }, { wch: 16 }, { wch: 16 },
+      { wch: 18 }, { wch: 18 }, { wch: 16 }, { wch: 16 },
+      { wch: 22 }, { wch: 18 }
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Billing_Ledger');
+    XLSX.writeFile(workbook, `Chhaya_Billing_Ledger_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
+  // 3. Handle Bulk Payment Excel Upload
+  const handleFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setBulkUploading(true);
+    setBulkResult(null);
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const data = new Uint8Array(evt.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+
+        if (jsonData.length === 0) {
+          throw new Error('Spreadsheet has no data rows.');
+        }
+
+        const parsedTransactions = jsonData.map((row, idx) => {
+          const getVal = (keys) => {
+            for (const k of Object.keys(row)) {
+              const clean = k.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+              for (const search of keys) {
+                if (clean.includes(search)) return String(row[k]).trim();
+              }
+            }
+            return '';
+          };
+
+          const identifier = getVal(['candidateid', 'leadid', 'mobile', 'phone', 'passport', 'id']);
+          const amount = Number(getVal(['amount', 'paid', 'total', 'amt'])) || 0;
+          const paymentType = getVal(['paymenttype', 'type', 'head', 'category']) || 'ADVANCE';
+          const paymentMode = getVal(['paymentmode', 'mode', 'method']) || 'UPI';
+          const referenceNumber = getVal(['reference', 'utr', 'receipt', 'ref', 'txn']);
+          const remarks = getVal(['remark', 'notes', 'description']);
+          const candidateName = getVal(['name', 'candidate', 'candidatename']);
+
+          return {
+            rowNumber: idx + 1,
+            leadId: identifier,
+            phone: identifier,
+            passportNumber: identifier,
+            candidateName,
+            amount,
+            paymentType,
+            paymentMode,
+            referenceNumber,
+            remarks
+          };
+        });
+
+        const res = await apiBulkImportBillBookTransactions(parsedTransactions);
+
+        setBulkResult({
+          total: parsedTransactions.length,
+          updatedCount: res.updatedCount || res.importedCount || 0,
+          failedCount: res.failedCount || 0,
+          failedRecords: res.failedRecords || []
+        });
+
+        fetchBillingLeads();
+      } catch (err) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Import Failed',
+          text: err.message || 'Error parsing payment transactions spreadsheet.',
+          confirmButtonColor: '#2563EB'
+        });
+      } finally {
+        setBulkUploading(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  // 4. Download Failed Payment Records (.csv)
+  const handleDownloadFailedBillingCSV = () => {
+    if (!bulkResult || !bulkResult.failedRecords || bulkResult.failedRecords.length === 0) return;
+
+    const headers = ['Row Number', 'Identifier (Lead ID / Mobile / Passport)', 'Candidate Name', 'Amount', 'Payment Type', 'Reference No', 'Failure Reason'];
+    const rows = bulkResult.failedRecords.map(f => [
+      f.rowNumber || '',
+      `"${f.leadId || f.phone || f.passportNumber || ''}"`,
+      `"${f.candidateName || ''}"`,
+      f.amount || '',
+      `"${f.paymentType || ''}"`,
+      `"${f.referenceNumber || ''}"`,
+      `"${(f.reason || 'Validation error').replace(/"/g, '""')}"`
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `Failed_Billing_Import_Records_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   // Export Ledger to CSV
   const handleExportLedger = () => {
     if (leads.length === 0) {
@@ -369,13 +564,40 @@ export default function AllInvoices() {
 
         {/* Action Toolbar */}
         <div className="flex items-center gap-2 flex-wrap">
+          {/* Hidden File Input for Excel Import */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileUpload}
+            accept=".xlsx, .xls, .csv"
+            className="hidden"
+          />
+
+          <button
+            onClick={() => setIsBulkModalOpen(true)}
+            className="h-9 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+            title="Import Excel Payment Bookings"
+          >
+            <Upload className="w-3.5 h-3.5" />
+            <span>Import Payments</span>
+          </button>
+
+          <button
+            onClick={handleExportBillingExcel}
+            className="h-9 px-3 bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+            title="Download Excel Ledger (.xlsx)"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Export Excel</span>
+          </button>
+
           <button
             onClick={handleExportLedger}
             className="h-9 px-3 bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
             title="Download CSV Ledger"
           >
             <Download className="w-3.5 h-3.5 text-gray-500" />
-            <span>Export Ledger</span>
+            <span>Export CSV</span>
           </button>
 
           <button
@@ -1278,6 +1500,139 @@ export default function AllInvoices() {
         lead={billBookLead}
         onUpdated={fetchBillingLeads}
       />
+
+      {/* 7. Bulk Payment Transactions Import Modal */}
+      {isBulkModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-gray-100 flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100 mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <Upload className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-gray-900">Import Payment Transactions</h3>
+                  <p className="text-xs text-gray-500">Bulk upload UPI, Cash or Bank ledger records via Excel/CSV</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setIsBulkModalOpen(false);
+                  setBulkResult(null);
+                }}
+                className="text-gray-400 hover:text-gray-600 p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+              {/* Instructions & Template */}
+              <div className="p-3.5 bg-blue-50/70 border border-blue-100 rounded-xl flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-bold text-blue-900">Standard Billing Template</p>
+                  <p className="text-[11px] text-blue-700">Columns: Candidate ID/Phone, Amount, Type, Mode, UTR/Receipt No</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleDownloadBillingTemplate}
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download .xlsx</span>
+                </button>
+              </div>
+
+              {/* Upload Drop Area */}
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="border-2 border-dashed border-gray-300 hover:border-emerald-500 hover:bg-emerald-50/20 rounded-2xl p-6 text-center cursor-pointer transition flex flex-col items-center justify-center gap-2 group"
+              >
+                <div className="w-12 h-12 rounded-full bg-emerald-50 group-hover:bg-emerald-100 text-emerald-600 flex items-center justify-center transition">
+                  {bulkUploading ? <Loader2 className="w-6 h-6 animate-spin" /> : <FileSpreadsheet className="w-6 h-6" />}
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-gray-700 group-hover:text-emerald-700">
+                    {bulkUploading ? 'Parsing & Recording Ledger...' : 'Click or Drop Payment Excel file here'}
+                  </p>
+                  <p className="text-[11px] text-gray-400 mt-0.5">Supports .xlsx, .xls and .csv formats</p>
+                </div>
+              </div>
+
+              {/* Results Breakdown */}
+              {bulkResult && (
+                <div className="mt-4 p-4 rounded-xl border border-gray-200 bg-gray-50/60 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-gray-800">Batch Processing Summary</span>
+                    <span className="text-xs text-gray-500 font-mono">Total Processed: {bulkResult.total}</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-2.5">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                      <div>
+                        <div className="text-sm font-bold text-emerald-900">{bulkResult.updatedCount}</div>
+                        <div className="text-[10px] text-emerald-700 font-medium">Successfully Credited</div>
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2.5">
+                      <XCircle className="w-5 h-5 text-red-600 shrink-0" />
+                      <div>
+                        <div className="text-sm font-bold text-red-900">{bulkResult.failedCount}</div>
+                        <div className="text-[10px] text-red-700 font-medium">Rejected / Validation Failed</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Failure Details */}
+                  {bulkResult.failedCount > 0 && (
+                    <div className="space-y-2 pt-2 border-t border-gray-200">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-red-700">Detailed Failure Reasons</span>
+                        <button
+                          type="button"
+                          onClick={handleDownloadFailedBillingCSV}
+                          className="text-[11px] font-semibold text-red-600 hover:text-red-800 underline flex items-center gap-1 cursor-pointer"
+                        >
+                          <Download className="w-3 h-3" />
+                          <span>Download Error Log (.csv)</span>
+                        </button>
+                      </div>
+
+                      <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1">
+                        {bulkResult.failedRecords.map((f, i) => (
+                          <div key={i} className="text-[11px] p-2 bg-white rounded-lg border border-red-100 flex items-start justify-between gap-2">
+                            <div>
+                              <span className="font-bold text-gray-800">Row {f.rowNumber}: </span>
+                              <span className="font-mono text-gray-600">{f.leadId || f.phone || f.passportNumber || 'N/A'}</span>
+                              {f.amount ? <span className="text-emerald-700 font-semibold ml-1.5">(₹{f.amount})</span> : null}
+                            </div>
+                            <span className="text-red-600 text-right font-medium shrink-0 max-w-[50%]">{f.reason}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="pt-3 border-t border-gray-100 mt-4 flex justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsBulkModalOpen(false);
+                  setBulkResult(null);
+                }}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-semibold transition cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

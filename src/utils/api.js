@@ -583,7 +583,15 @@ export const apiBulkUpdateVisaResults = async (updates) => {
   });
 };
 
-// 34. Global Immutable Activity & Audit Trail (FRD Section 19)
+// 34. Bulk Bill Book Payments & Receipts Import via Excel
+export const apiBulkImportBillBookTransactions = async (transactions) => {
+  return authFetch('/leads/billbook/bulk-transactions', {
+    method: 'POST',
+    body: JSON.stringify({ transactions })
+  });
+};
+
+// 35. Global Immutable Activity & Audit Trail (FRD Section 19)
 export const apiGetAuditLogs = async (params = {}) => {
   const query = new URLSearchParams();
   if (params.search) query.append('search', params.search);
