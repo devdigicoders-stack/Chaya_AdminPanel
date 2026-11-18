@@ -567,7 +567,15 @@ export const apiAdminLeadOverride = async (id, overrideData) => {
   });
 };
 
-// 32. Global Immutable Activity & Audit Trail (FRD Section 19)
+// 32. Bulk Medical Results Import via Excel
+export const apiBulkUpdateMedicalResults = async (results) => {
+  return authFetch('/leads/bulk-medical-results', {
+    method: 'POST',
+    body: JSON.stringify({ results })
+  });
+};
+
+// 33. Global Immutable Activity & Audit Trail (FRD Section 19)
 export const apiGetAuditLogs = async (params = {}) => {
   const query = new URLSearchParams();
   if (params.search) query.append('search', params.search);
