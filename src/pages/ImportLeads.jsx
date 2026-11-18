@@ -265,23 +265,57 @@ export default function ImportLeads() {
     }, 400);
   };
 
-  // 3. Download Real CSV Template
+  // 3. Download Real Excel (.xlsx) Template with formatted sample rows
   const handleDownloadTemplate = () => {
-    const headers = ['Candidate Name', 'Mobile Number', 'Trade Skill', 'Target Country', 'State', 'Passport Status', 'Passport Number'];
-    const sampleRows = [
-      ['Ramesh Kumar Yadav', '9876543210', '6G Pipe Fabricator & Welder', 'Saudi Arabia', 'Bihar', 'Yes', 'P7823901'],
-      ['Vikram Singh Rawat', '9988776655', 'HVAC Technician & Chiller Operator', 'United Arab Emirates', 'Uttar Pradesh', 'Applied', ''],
-      ['Sandeep Kumar', '9123456789', 'Heavy Duty Trailer Driver', 'Qatar', 'Jharkhand', 'No', '']
+    const data = [
+      {
+        'Candidate Name': 'Ramesh Kumar Yadav',
+        'Mobile Number': '9876543210',
+        'Trade Skill': '6G Pipe Fabricator & Welder',
+        'Target Country': 'Saudi Arabia',
+        'State': 'Bihar',
+        'Passport Status': 'Yes',
+        'Passport Number': 'P7823901'
+      },
+      {
+        'Candidate Name': 'Vikram Singh Rawat',
+        'Mobile Number': '9988776655',
+        'Trade Skill': 'HVAC Technician & Chiller Operator',
+        'Target Country': 'United Arab Emirates',
+        'State': 'Uttar Pradesh',
+        'Passport Status': 'Applied',
+        'Passport Number': ''
+      },
+      {
+        'Candidate Name': 'Sandeep Kumar',
+        'Mobile Number': '9123456789',
+        'Trade Skill': 'Heavy Duty Trailer Driver',
+        'Target Country': 'Qatar',
+        'State': 'Jharkhand',
+        'Passport Status': 'No',
+        'Passport Number': ''
+      }
     ];
 
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...sampleRows.map(r => r.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', 'overseas_recruitment_candidate_template.csv');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // Create a new Excel workbook & sheet using SheetJS (XLSX)
+    const worksheet = XLSX.utils.json_to_sheet(data);
+
+    // Auto set column widths for a clean professional look
+    worksheet['!cols'] = [
+      { wch: 24 }, // Candidate Name
+      { wch: 16 }, // Mobile Number
+      { wch: 32 }, // Trade Skill
+      { wch: 22 }, // Target Country
+      { wch: 16 }, // State
+      { wch: 16 }, // Passport Status
+      { wch: 18 }  // Passport Number
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Candidates_Template');
+
+    // Trigger true .xlsx Excel file download
+    XLSX.writeFile(workbook, 'overseas_recruitment_candidate_template.xlsx');
   };
 
   // 4. Download Failed Records for Re-editing
@@ -410,11 +444,11 @@ export default function ImportLeads() {
         <div className="flex items-center gap-2.5">
           <button
             onClick={handleDownloadTemplate}
-            className="h-9.5 px-3.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-all active:scale-[0.98] cursor-pointer"
-            title="Download Ready-to-Use Import Template (.csv)"
+            className="h-9.5 px-3.5 bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-300 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all active:scale-[0.98] cursor-pointer"
+            title="Download Ready-to-Use Import Template (.xlsx)"
           >
             <Download className="w-4 h-4 text-emerald-600" />
-            <span>Download .CSV Template</span>
+            <span>Download Excel Template (.xlsx)</span>
           </button>
 
           <button
