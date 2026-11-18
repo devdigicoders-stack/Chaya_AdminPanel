@@ -6,7 +6,7 @@ import {
   X, Globe, Phone, MapPin,
   FileSpreadsheet, Share2, Layers, AlertCircle, Sparkles,
   Trash2, Edit, PauseCircle, PlayCircle, History, Clock,
-  MessageCircle, Building2, UserPlus, Calendar
+  MessageCircle, Building2, UserPlus, Calendar, Download
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import {
@@ -532,6 +532,40 @@ export default function Leads() {
           >
             <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
             <span>Bulk Import</span>
+          </button>
+
+          <button
+            onClick={() => {
+              if (leads.length === 0) {
+                Swal.fire('No Data', 'No candidates available to export.', 'info');
+                return;
+              }
+              const headers = ['Lead ID', 'Candidate Name', 'Phone', 'Trade', 'Stage', 'Assigned Staff', 'Source', 'Passport Status'];
+              const rows = leads.map(l => [
+                l.leadId || l._id,
+                `"${l.candidateName || ''}"`,
+                l.phone || '',
+                `"${l.trade || ''}"`,
+                l.currentStage || '',
+                `"${l.callingStaffId?.name || l.staffHeadId?.name || 'Unassigned'}"`,
+                l.source || 'EXCEL',
+                l.isPassportHolder || 'NOT_CONFIRMED'
+              ]);
+              const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+              const encodedUri = encodeURI(csvContent);
+              const link = document.createElement('a');
+              link.setAttribute('href', encodedUri);
+              link.setAttribute('download', `Chhaya_Leads_Pool_${new Date().toISOString().split('T')[0]}.csv`);
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              showToast('Leads roster exported to CSV successfully');
+            }}
+            className="h-9 px-3 bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
+            title="Export filtered leads to CSV"
+          >
+            <Download className="w-3.5 h-3.5 text-gray-500" />
+            <span>Export CSV</span>
           </button>
 
           <button
