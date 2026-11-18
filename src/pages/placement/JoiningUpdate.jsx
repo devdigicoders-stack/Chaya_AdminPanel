@@ -1,13 +1,14 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   ChevronRight, Plane, Calendar, Search, 
   X, CheckCircle2, 
   Check, FileText, Globe, Award, 
   RefreshCw, AlertCircle, Loader2, Edit3, Eye, Printer, Navigation,
-  Ticket, Video, ShieldCheck } from 'lucide-react';
+  Ticket, Video, ShieldCheck, Upload, FileSpreadsheet, Download, XCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
-import { apiGetLeads, apiUpdatePlacementDeployment } from '../../utils/api';
+import * as XLSX from 'xlsx';
+import { apiGetLeads, apiUpdatePlacementDeployment, apiBulkUpdatePlacementDeployment } from '../../utils/api';
 import ConfirmationsModal from '../../components/leads/ConfirmationsModal';
 
 const AIRLINES = [
@@ -24,12 +25,18 @@ const AIRLINES = [
 
 export default function JoiningUpdate() {
   const navigate = useNavigate();
+  const fileInputRef = useRef(null);
 
   // State
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState(null);
   const [error, setError] = useState('');
+
+  // Bulk Flight Import Modal State
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
+  const [bulkUploading, setBulkUploading] = useState(false);
+  const [bulkResult, setBulkResult] = useState(null);
 
   // Filters & Search
   const [searchTerm, setSearchTerm] = useState('');
@@ -206,6 +213,234 @@ export default function JoiningUpdate() {
     });
   }, [leads, searchTerm, statusFilter]);
 
+  // 1. Download Flight Tickets Import Template (.xlsx)
+  const handleDownloadFlightTemplate = () => {
+    const data = [
+      {
+        'Candidate ID / Mobile / Passport': 'CHY-1002',
+        'Candidate Name': 'Vikram Singh Rawat',
+        'Airline Name': 'Emirates Airlines',
+        'Flight Number': 'EK 511',
+        'PNR Number': 'EK79201',
+        'Sector': 'DEL - DXB',
+        'Departure Airport': 'Indira Gandhi Int Airport (DEL)',
+        'Arrival Airport': 'Dubai Int Airport (DXB)',
+        'Flight Date (YYYY-MM-DD)': '2026-11-25',
+        'Flight Time': '09:45 AM',
+        'Joining Date (YYYY-MM-DD)': '2026-11-28',
+        'POE Emigration Status': 'POE Cleared (Emigration OK)',
+        'Baggage Allowance': '30 KG Check-in + 7 KG Cabin',
+        'Pickup Officer': 'Mr. Tariq (HR Officer)',
+        'Camp Location': 'Jebel Ali Camp 4, Dubai',
+        'Deployment Status (FLIGHT_BOOKED / DEPARTED / JOINED_ON_SITE)': 'FLIGHT_BOOKED',
+        'Notes': 'Flight ticket booked and e-ticket sent on WhatsApp'
+      },
+      {
+        'Candidate ID / Mobile / Passport': '9123456789',
+        'Candidate Name': 'Sandeep Kumar',
+        'Airline Name': 'Qatar Airways',
+        'Flight Number': 'QR 571',
+        'PNR Number': 'QR99312',
+        'Sector': 'DEL - DOH',
+        'Departure Airport': 'Indira Gandhi Int Airport (DEL)',
+        'Arrival Airport': 'Hamad Int Airport (DOH)',
+        'Flight Date (YYYY-MM-DD)': '2026-11-27',
+        'Flight Time': '04:15 AM',
+        'Joining Date (YYYY-MM-DD)': '2026-11-30',
+        'POE Emigration Status': 'POE Cleared',
+        'Baggage Allowance': '30 KG Check-in + 7 KG Cabin',
+        'Pickup Officer': 'Mr. Rashid',
+        'Camp Location': 'Industrial Area, Doha',
+        'Deployment Status (FLIGHT_BOOKED / DEPARTED / JOINED_ON_SITE)': 'FLIGHT_BOOKED',
+        'Notes': 'Final travel briefing completed'
+      }
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    worksheet['!cols'] = [
+      { wch: 32 }, { wch: 22 }, { wch: 20 }, { wch: 16 },
+      { wch: 16 }, { wch: 16 }, { wch: 30 }, { wch: 30 },
+      { wch: 24 }, { wch: 16 }, { wch: 24 }, { wch: 28 },
+      { wch: 28 }, { wch: 24 }, { wch: 28 }, { wch: 32 }, { wch: 38 }
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Flight_Tickets_Template');
+    XLSX.writeFile(workbook, 'overseas_flight_tickets_import_template.xlsx');
+  };
+
+  // 2. Export Current Flight & Deployment Registry to Excel (.xlsx)
+  const handleExportDeploymentExcel = () => {
+    if (filteredLeads.length === 0) {
+      Swal.fire('No Data', 'No flight deployment records to export.', 'info');
+      return;
+    }
+
+    const data = filteredLeads.map(l => {
+      const dep = l.placementDetails?.deployment || {};
+      return {
+        'Lead ID': l.leadId || l._id,
+        'Candidate Name': l.candidateName || '',
+        'Phone Number': l.phone || '',
+        'Passport Number': l.passportNumber || '',
+        'Trade Skill': l.trade || '',
+        'Target Country': dep.country || l.country || '',
+        'Employer Company': dep.company || l.placementDetails?.offerLetter?.company || '',
+        'Airline': dep.airline || '',
+        'Flight No': dep.flightNumber || '',
+        'PNR Number': dep.pnr || '',
+        'Sector': dep.sector || '',
+        'Departure Airport': dep.departureAirport || '',
+        'Arrival Airport': dep.arrivalAirport || '',
+        'Flight Date': dep.flightDate ? new Date(dep.flightDate).toISOString().split('T')[0] : '',
+        'Flight Time': dep.flightTime || '',
+        'Joining Date': dep.joiningDate ? new Date(dep.joiningDate).toISOString().split('T')[0] : '',
+        'POE Status': dep.poeStatus || '',
+        'Baggage': dep.baggage || '',
+        'Pickup Officer': dep.pickupOfficer || '',
+        'Camp Location': dep.campLocation || '',
+        'Deployment Status': dep.status || 'PENDING_TICKET',
+        'Video Agreement': dep.videoAgreementStatus || (dep.videoAgreementVerified ? 'VERIFIED' : 'PENDING'),
+        'Remarks': dep.notes || ''
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    worksheet['!cols'] = [
+      { wch: 16 }, { wch: 22 }, { wch: 16 }, { wch: 18 },
+      { wch: 22 }, { wch: 16 }, { wch: 24 }, { wch: 20 },
+      { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 28 },
+      { wch: 28 }, { wch: 16 }, { wch: 14 }, { wch: 16 },
+      { wch: 18 }, { wch: 22 }, { wch: 22 }, { wch: 26 },
+      { wch: 20 }, { wch: 18 }, { wch: 30 }
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Flight_Manifest');
+    XLSX.writeFile(workbook, `Overseas_Flight_Deployment_Manifest_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
+  // 3. Handle Bulk Flight Excel Upload
+  const handleFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setBulkUploading(true);
+    setBulkResult(null);
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const data = new Uint8Array(evt.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+
+        if (jsonData.length === 0) {
+          throw new Error('Spreadsheet has no data rows.');
+        }
+
+        const parsedDeployments = jsonData.map((row, idx) => {
+          const getVal = (keys) => {
+            for (const k of Object.keys(row)) {
+              const clean = k.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+              for (const search of keys) {
+                if (clean.includes(search)) return String(row[k]).trim();
+              }
+            }
+            return '';
+          };
+
+          const identifier = getVal(['candidateid', 'leadid', 'mobile', 'phone', 'passport', 'id']);
+          const airline = getVal(['airline', 'airlinename', 'carrier']);
+          const flightNumber = getVal(['flightnumber', 'flightno', 'flight']);
+          const pnr = getVal(['pnr', 'pnrnumber', 'bookingref', 'ticketno', 'eticket']);
+          const sector = getVal(['sector', 'route']);
+          const departureAirport = getVal(['departureairport', 'fromairport', 'depairport', 'origin']);
+          const arrivalAirport = getVal(['arrivalairport', 'toairport', 'destairport', 'destination']);
+          const flightDate = getVal(['flightdate', 'traveldate', 'departuredate', 'deptdate']);
+          const flightTime = getVal(['flighttime', 'deptime', 'time']);
+          const joiningDate = getVal(['joiningdate', 'workdate', 'startdate', 'reportdate']);
+          const poeStatus = getVal(['poestatus', 'poe', 'emigration']);
+          const baggage = getVal(['baggage', 'baggageallowance', 'luggage']);
+          const pickupOfficer = getVal(['pickupofficer', 'pickup', 'driver', 'officer']);
+          const campLocation = getVal(['camplocation', 'camp', 'accommodation', 'hotel']);
+          const status = getVal(['deploymentstatus', 'status', 'stage']);
+          const notes = getVal(['notes', 'remarks', 'comment']);
+          const candidateName = getVal(['name', 'candidate', 'candidatename']);
+
+          return {
+            rowNumber: idx + 1,
+            leadId: identifier,
+            phone: identifier,
+            passportNumber: identifier,
+            candidateName,
+            airline: airline || 'Commercial Flight',
+            flightNumber,
+            pnr,
+            sector,
+            departureAirport,
+            arrivalAirport,
+            flightDate,
+            flightTime,
+            joiningDate,
+            poeStatus: poeStatus || 'POE Cleared',
+            baggage: baggage || '30 KG Check-in + 7 KG Cabin',
+            pickupOfficer,
+            campLocation,
+            status: status || 'FLIGHT_BOOKED',
+            notes
+          };
+        });
+
+        const res = await apiBulkUpdatePlacementDeployment(parsedDeployments);
+
+        setBulkResult({
+          total: parsedDeployments.length,
+          updatedCount: res.updatedCount || 0,
+          failedCount: res.failedCount || 0,
+          failedRecords: res.failedRecords || []
+        });
+
+        fetchPlacementLeads();
+      } catch (err) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Import Failed',
+          text: err.message || 'Error parsing flight deployment spreadsheet.',
+          confirmButtonColor: '#2563EB'
+        });
+      } finally {
+        setBulkUploading(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  // 4. Download Failed Flight Records (.csv)
+  const handleDownloadFailedFlightCSV = () => {
+    if (!bulkResult || !bulkResult.failedRecords || bulkResult.failedRecords.length === 0) return;
+
+    const headers = ['Row Number', 'Identifier (Lead ID / Mobile / Passport)', 'Candidate Name', 'Failure Reason'];
+    const rows = bulkResult.failedRecords.map(f => [
+      f.rowNumber || '',
+      `"${f.identifier || f.leadId || f.phone || f.passportNumber || ''}"`,
+      `"${f.candidateName || ''}"`,
+      `"${(f.reason || 'Validation error').replace(/"/g, '""')}"`
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `Failed_Flight_Tickets_Import_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   // Dynamic KPI Metrics
   const metrics = useMemo(() => {
     const total = leads.length;
@@ -243,6 +478,33 @@ export default function JoiningUpdate() {
 
         {/* Action Toolbar */}
         <div className="flex items-center gap-2 flex-wrap">
+          {/* Hidden File Input for Excel Import */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileUpload}
+            accept=".xlsx, .xls, .csv"
+            className="hidden"
+          />
+
+          <button
+            onClick={() => setIsBulkModalOpen(true)}
+            className="h-9 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+            title="Import Flight Tickets via Excel"
+          >
+            <Upload className="w-3.5 h-3.5" />
+            <span>Import Flight Tickets</span>
+          </button>
+
+          <button
+            onClick={handleExportDeploymentExcel}
+            className="h-9 px-3 bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+            title="Download Flight Manifest (.xlsx)"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Export Manifest</span>
+          </button>
+
           <button 
             onClick={() => {
               if (leads.length > 0) {
@@ -960,6 +1222,139 @@ export default function JoiningUpdate() {
         lead={confirmationsModalLead}
         onUpdated={fetchDeployments}
       />
+
+      {/* 8. Bulk Flight Tickets & Deployment Import Modal */}
+      {isBulkModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-gray-100 flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100 mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <Plane className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-gray-900">Import Flight Tickets & Travel Manifest</h3>
+                  <p className="text-xs text-gray-500">Bulk upload Airline, Flight No, PNR & Dates via Excel/CSV</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setIsBulkModalOpen(false);
+                  setBulkResult(null);
+                }}
+                className="text-gray-400 hover:text-gray-600 p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+              {/* Instructions & Template */}
+              <div className="p-3.5 bg-blue-50/70 border border-blue-100 rounded-xl flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-bold text-blue-900">Standard Flight Booking Template</p>
+                  <p className="text-[11px] text-blue-700">Columns: Candidate ID/Mobile, Airline, Flight No, PNR, Flight Date, Sector</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleDownloadFlightTemplate}
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download .xlsx</span>
+                </button>
+              </div>
+
+              {/* Upload Drop Area */}
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="border-2 border-dashed border-gray-300 hover:border-blue-500 hover:bg-blue-50/20 rounded-2xl p-6 text-center cursor-pointer transition flex flex-col items-center justify-center gap-2 group"
+              >
+                <div className="w-12 h-12 rounded-full bg-blue-50 group-hover:bg-blue-100 text-blue-600 flex items-center justify-center transition">
+                  {bulkUploading ? <Loader2 className="w-6 h-6 animate-spin" /> : <FileSpreadsheet className="w-6 h-6" />}
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-gray-700 group-hover:text-blue-700">
+                    {bulkUploading ? 'Booking & Recording Flights...' : 'Click or Drop Flight Tickets Excel file here'}
+                  </p>
+                  <p className="text-[11px] text-gray-400 mt-0.5">Supports .xlsx, .xls and .csv formats</p>
+                </div>
+              </div>
+
+              {/* Results Breakdown */}
+              {bulkResult && (
+                <div className="mt-4 p-4 rounded-xl border border-gray-200 bg-gray-50/60 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-gray-800">Batch Processing Summary</span>
+                    <span className="text-xs text-gray-500 font-mono">Total Processed: {bulkResult.total}</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-2.5">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                      <div>
+                        <div className="text-sm font-bold text-emerald-900">{bulkResult.updatedCount}</div>
+                        <div className="text-[10px] text-emerald-700 font-medium">Successfully Booked / Updated</div>
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2.5">
+                      <XCircle className="w-5 h-5 text-red-600 shrink-0" />
+                      <div>
+                        <div className="text-sm font-bold text-red-900">{bulkResult.failedCount}</div>
+                        <div className="text-[10px] text-red-700 font-medium">Failed / Unmatched Records</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Failure Details */}
+                  {bulkResult.failedCount > 0 && (
+                    <div className="space-y-2 pt-2 border-t border-gray-200">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-red-700">Detailed Failure Reasons</span>
+                        <button
+                          type="button"
+                          onClick={handleDownloadFailedFlightCSV}
+                          className="text-[11px] font-semibold text-red-600 hover:text-red-800 underline flex items-center gap-1 cursor-pointer"
+                        >
+                          <Download className="w-3 h-3" />
+                          <span>Download Error Log (.csv)</span>
+                        </button>
+                      </div>
+
+                      <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1">
+                        {bulkResult.failedRecords.map((f, i) => (
+                          <div key={i} className="text-[11px] p-2 bg-white rounded-lg border border-red-100 flex items-start justify-between gap-2">
+                            <div>
+                              <span className="font-bold text-gray-800">Row {f.rowNumber}: </span>
+                              <span className="font-mono text-gray-600">{f.identifier || 'N/A'}</span>
+                              {f.candidateName && f.candidateName !== 'N/A' ? <span className="text-gray-700 font-semibold ml-1.5">({f.candidateName})</span> : null}
+                            </div>
+                            <span className="text-red-600 text-right font-medium shrink-0 max-w-[50%]">{f.reason}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="pt-3 border-t border-gray-100 mt-4 flex justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsBulkModalOpen(false);
+                  setBulkResult(null);
+                }}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-semibold transition cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

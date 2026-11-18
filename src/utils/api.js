@@ -591,7 +591,15 @@ export const apiBulkImportBillBookTransactions = async (transactions) => {
   });
 };
 
-// 35. Global Immutable Activity & Audit Trail (FRD Section 19)
+// 35. Bulk Flight Tickets & Deployment Import via Excel
+export const apiBulkUpdatePlacementDeployment = async (deployments) => {
+  return authFetch('/leads/placement/bulk-deployment', {
+    method: 'POST',
+    body: JSON.stringify({ deployments })
+  });
+};
+
+// 36. Global Immutable Activity & Audit Trail (FRD Section 19)
 export const apiGetAuditLogs = async (params = {}) => {
   const query = new URLSearchParams();
   if (params.search) query.append('search', params.search);
