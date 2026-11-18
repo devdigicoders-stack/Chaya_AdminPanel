@@ -403,7 +403,7 @@ export default function JoiningUpdate() {
           failedRecords: res.failedRecords || []
         });
 
-        fetchPlacementLeads();
+        fetchDeployments();
       } catch (err) {
         Swal.fire({
           icon: 'error',
