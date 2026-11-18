@@ -599,7 +599,15 @@ export const apiBulkUpdatePlacementDeployment = async (deployments) => {
   });
 };
 
-// 36. Global Immutable Activity & Audit Trail (FRD Section 19)
+// 36. Bulk Register Staff Directory via Excel
+export const apiBulkRegisterUsers = async (users) => {
+  return authFetch('/auth/bulk-register', {
+    method: 'POST',
+    body: JSON.stringify({ users })
+  });
+};
+
+// 37. Global Immutable Activity & Audit Trail (FRD Section 19)
 export const apiGetAuditLogs = async (params = {}) => {
   const query = new URLSearchParams();
   if (params.search) query.append('search', params.search);

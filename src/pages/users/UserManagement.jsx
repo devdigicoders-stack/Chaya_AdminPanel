@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   UserPlus, Download, Users, UserCheck, Shield,
   Building2, Search, Eye, 
@@ -7,10 +7,11 @@ import {
   Edit, Trash2, 
   Loader2, Power,
   ChevronRight, History, Clock, Sparkles, Activity, Globe, ArrowUpRight,
-  Lock, EyeOff, Copy, Target
+  Lock, EyeOff, Copy, Target, Upload, FileSpreadsheet, CheckCircle2, XCircle
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
+import * as XLSX from 'xlsx';
 import { 
   apiGetUsers, 
   apiRegisterUser, 
@@ -19,6 +20,7 @@ import {
   apiDeleteUser,
   apiGetUserHistory,
   apiUpdateUserTargets,
+  apiBulkRegisterUsers,
   getCurrentUser 
 } from '../../utils/api';
 
@@ -38,12 +40,18 @@ const SYSTEM_ROLES = [
 
 export default function UserManagement() {
   const navigate = useNavigate();
+  const fileInputRef = useRef(null);
   const currentLoggedInUser = getCurrentUser();
 
   // State
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Bulk Staff Import Modal State
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
+  const [bulkUploading, setBulkUploading] = useState(false);
+  const [bulkResult, setBulkResult] = useState(null);
 
   // Filters & Search
   const [searchTerm, setSearchTerm] = useState('');
@@ -387,6 +395,177 @@ export default function UserManagement() {
     });
   }, [users, activeTab, roleFilter, deptFilter, searchTerm]);
 
+  // 1. Download Staff Onboarding Template (.xlsx)
+  const handleDownloadStaffTemplate = () => {
+    const data = [
+      {
+        'Full Name': 'Amit Sharma',
+        'Email Address': 'amit.calling@chhaya.com',
+        'Mobile Number': '9876543211',
+        'Role (ADMIN / STAFF_HEAD / CALLING_STAFF / INTERVIEW_PANEL / MEDICAL_DEPT / ACCOUNTS / PRE_VISA_MANAGER / VISA_MANAGER / VIVA_MANAGER / DATA_CONTROLLER)': 'CALLING_STAFF',
+        'Department': 'Calling & Screening Desk',
+        'Initial Password': 'Pass@123'
+      },
+      {
+        'Full Name': 'Dr. Rajesh Verma',
+        'Email Address': 'dr.rajesh@chhaya.com',
+        'Mobile Number': '9876543212',
+        'Role (ADMIN / STAFF_HEAD / CALLING_STAFF / INTERVIEW_PANEL / MEDICAL_DEPT / ACCOUNTS / PRE_VISA_MANAGER / VISA_MANAGER / VIVA_MANAGER / DATA_CONTROLLER)': 'MEDICAL_DEPT',
+        'Department': 'Medical GAMCA Desk',
+        'Initial Password': 'Pass@123'
+      },
+      {
+        'Full Name': 'Sunita Rao',
+        'Email Address': 'sunita.accounts@chhaya.com',
+        'Mobile Number': '9876543213',
+        'Role (ADMIN / STAFF_HEAD / CALLING_STAFF / INTERVIEW_PANEL / MEDICAL_DEPT / ACCOUNTS / PRE_VISA_MANAGER / VISA_MANAGER / VIVA_MANAGER / DATA_CONTROLLER)': 'ACCOUNTS',
+        'Department': 'Bill Book & Accounts',
+        'Initial Password': 'Pass@123'
+      }
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    worksheet['!cols'] = [
+      { wch: 24 }, { wch: 28 }, { wch: 18 }, { wch: 36 },
+      { wch: 26 }, { wch: 18 }
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Staff_Import_Template');
+    XLSX.writeFile(workbook, 'chhaya_staff_directory_template.xlsx');
+  };
+
+  // 2. Export Staff Directory to Excel (.xlsx)
+  const handleExportStaffExcel = () => {
+    if (filteredUsers.length === 0) {
+      Swal.fire({ icon: 'info', title: 'No Data', text: 'No staff records to export.' });
+      return;
+    }
+
+    const data = filteredUsers.map(u => ({
+      'Staff ID': u._id,
+      'Full Name': u.name || '',
+      'Email': u.email || '',
+      'Mobile Phone': u.phone || '',
+      'System Role': u.role || '',
+      'Department': u.department || '',
+      'Account Status': u.isActive ? 'Active' : 'Inactive',
+      'Target Medicals': u.targets?.medicals || 0,
+      'Target Advances': u.targets?.advances || 0,
+      'Target Visas': u.targets?.visas || 0,
+      'Created Date': u.createdAt ? new Date(u.createdAt).toISOString().split('T')[0] : ''
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    worksheet['!cols'] = [
+      { wch: 26 }, { wch: 22 }, { wch: 26 }, { wch: 16 },
+      { wch: 20 }, { wch: 24 }, { wch: 16 }, { wch: 16 },
+      { wch: 16 }, { wch: 16 }, { wch: 16 }
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Staff_Directory');
+    XLSX.writeFile(workbook, `Chhaya_Staff_Directory_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
+  // 3. Handle Bulk Staff Excel Upload
+  const handleFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setBulkUploading(true);
+    setBulkResult(null);
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const data = new Uint8Array(evt.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+
+        if (jsonData.length === 0) {
+          throw new Error('Spreadsheet has no data rows.');
+        }
+
+        const parsedUsers = jsonData.map((row, idx) => {
+          const getVal = (keys) => {
+            for (const k of Object.keys(row)) {
+              const clean = k.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+              for (const search of keys) {
+                if (clean.includes(search)) return String(row[k]).trim();
+              }
+            }
+            return '';
+          };
+
+          const name = getVal(['fullname', 'name', 'staffname', 'officer']);
+          const email = getVal(['email', 'emailaddress', 'mail']);
+          const phone = getVal(['mobile', 'phone', 'contact', 'phonenumber']);
+          const role = getVal(['role', 'systemrole', 'designation', 'position']);
+          const department = getVal(['department', 'dept', 'team']);
+          const password = getVal(['password', 'initialpassword', 'pass']);
+
+          return {
+            rowNumber: idx + 1,
+            name,
+            email,
+            phone,
+            role: role || 'CALLING_STAFF',
+            department: department || 'Operations',
+            password: password || 'Chhaya@123'
+          };
+        });
+
+        const res = await apiBulkRegisterUsers(parsedUsers);
+
+        setBulkResult({
+          total: parsedUsers.length,
+          updatedCount: res.createdCount || 0,
+          failedCount: res.failedCount || 0,
+          failedRecords: res.failedRecords || []
+        });
+
+        loadUsers();
+      } catch (err) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Import Failed',
+          text: err.message || 'Error parsing staff spreadsheet.',
+          confirmButtonColor: '#2563EB'
+        });
+      } finally {
+        setBulkUploading(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  // 4. Download Failed Staff Records (.csv)
+  const handleDownloadFailedStaffCSV = () => {
+    if (!bulkResult || !bulkResult.failedRecords || bulkResult.failedRecords.length === 0) return;
+
+    const headers = ['Row Number', 'Staff Name', 'Email', 'Phone', 'Failure Reason'];
+    const rows = bulkResult.failedRecords.map(f => [
+      f.rowNumber || '',
+      `"${f.name || ''}"`,
+      `"${f.email || ''}"`,
+      `"${f.phone || ''}"`,
+      `"${(f.reason || 'Validation error').replace(/"/g, '""')}"`
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `Failed_Staff_Onboarding_Records_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   // Export CSV
   const handleExportCSV = () => {
     if (filteredUsers.length === 0) {
@@ -479,6 +658,33 @@ export default function UserManagement() {
 
         {/* Action Toolbar - strictly single-line, shrink-0, whitespace-nowrap */}
         <div className="flex items-center gap-2.5 shrink-0 flex-wrap sm:flex-nowrap">
+          {/* Hidden File Input for Excel Import */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileUpload}
+            accept=".xlsx, .xls, .csv"
+            className="hidden"
+          />
+
+          <button
+            onClick={() => setIsBulkModalOpen(true)}
+            className="h-9.5 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold flex items-center gap-2 shadow-2xs transition-all active:scale-[0.98] cursor-pointer whitespace-nowrap"
+            title="Import Staff Directory via Excel"
+          >
+            <Upload className="w-3.5 h-3.5" />
+            <span>Import Staff</span>
+          </button>
+
+          <button
+            onClick={handleExportStaffExcel}
+            className="h-9.5 px-3.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-2xs transition-all active:scale-[0.98] cursor-pointer whitespace-nowrap"
+            title="Download Staff Directory (.xlsx)"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Export Excel</span>
+          </button>
+
           <button 
             onClick={loadUsers}
             disabled={loading}
@@ -1747,6 +1953,139 @@ export default function UserManagement() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Staff Onboarding Import Modal */}
+      {isBulkModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-gray-100 flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100 mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                  <Users className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-gray-900">Bulk Onboard Staff Members</h3>
+                  <p className="text-xs text-gray-500">Import multiple employees & assign roles via Excel/CSV</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setIsBulkModalOpen(false);
+                  setBulkResult(null);
+                }}
+                className="text-gray-400 hover:text-gray-600 p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+              {/* Instructions & Template */}
+              <div className="p-3.5 bg-purple-50/70 border border-purple-100 rounded-xl flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-bold text-purple-900">Official Staff Onboarding Template</p>
+                  <p className="text-[11px] text-purple-700">Columns: Full Name, Email, Phone, Role, Department, Initial Password</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleDownloadStaffTemplate}
+                  className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download .xlsx</span>
+                </button>
+              </div>
+
+              {/* Upload Drop Area */}
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="border-2 border-dashed border-gray-300 hover:border-purple-500 hover:bg-purple-50/20 rounded-2xl p-6 text-center cursor-pointer transition flex flex-col items-center justify-center gap-2 group"
+              >
+                <div className="w-12 h-12 rounded-full bg-purple-50 group-hover:bg-purple-100 text-purple-600 flex items-center justify-center transition">
+                  {bulkUploading ? <Loader2 className="w-6 h-6 animate-spin" /> : <FileSpreadsheet className="w-6 h-6" />}
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-gray-700 group-hover:text-purple-700">
+                    {bulkUploading ? 'Creating User Accounts...' : 'Click or Drop Staff Excel file here'}
+                  </p>
+                  <p className="text-[11px] text-gray-400 mt-0.5">Supports .xlsx, .xls and .csv formats</p>
+                </div>
+              </div>
+
+              {/* Results Breakdown */}
+              {bulkResult && (
+                <div className="mt-4 p-4 rounded-xl border border-gray-200 bg-gray-50/60 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-gray-800">Batch Processing Summary</span>
+                    <span className="text-xs text-gray-500 font-mono">Total Processed: {bulkResult.total}</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-2.5">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                      <div>
+                        <div className="text-sm font-bold text-emerald-900">{bulkResult.updatedCount}</div>
+                        <div className="text-[10px] text-emerald-700 font-medium">Successfully Created</div>
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2.5">
+                      <XCircle className="w-5 h-5 text-red-600 shrink-0" />
+                      <div>
+                        <div className="text-sm font-bold text-red-900">{bulkResult.failedCount}</div>
+                        <div className="text-[10px] text-red-700 font-medium">Rejected / Validation Failed</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Failure Details */}
+                  {bulkResult.failedCount > 0 && (
+                    <div className="space-y-2 pt-2 border-t border-gray-200">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-red-700">Detailed Failure Reasons</span>
+                        <button
+                          type="button"
+                          onClick={handleDownloadFailedStaffCSV}
+                          className="text-[11px] font-semibold text-red-600 hover:text-red-800 underline flex items-center gap-1 cursor-pointer"
+                        >
+                          <Download className="w-3 h-3" />
+                          <span>Download Error Log (.csv)</span>
+                        </button>
+                      </div>
+
+                      <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1">
+                        {bulkResult.failedRecords.map((f, i) => (
+                          <div key={i} className="text-[11px] p-2 bg-white rounded-lg border border-red-100 flex items-start justify-between gap-2">
+                            <div>
+                              <span className="font-bold text-gray-800">Row {f.rowNumber}: </span>
+                              <span className="font-mono text-gray-700">{f.name || 'N/A'}</span>
+                              {f.email ? <span className="text-gray-500 ml-1.5">({f.email})</span> : null}
+                            </div>
+                            <span className="text-red-600 text-right font-medium shrink-0 max-w-[50%]">{f.reason}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="pt-3 border-t border-gray-100 mt-4 flex justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsBulkModalOpen(false);
+                  setBulkResult(null);
+                }}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-semibold transition cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
