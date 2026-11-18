@@ -575,7 +575,15 @@ export const apiBulkUpdateMedicalResults = async (results) => {
   });
 };
 
-// 33. Global Immutable Activity & Audit Trail (FRD Section 19)
+// 33. Bulk Visa Status Updates via Excel
+export const apiBulkUpdateVisaResults = async (updates) => {
+  return authFetch('/leads/bulk-visa-updates', {
+    method: 'POST',
+    body: JSON.stringify({ updates })
+  });
+};
+
+// 34. Global Immutable Activity & Audit Trail (FRD Section 19)
 export const apiGetAuditLogs = async (params = {}) => {
   const query = new URLSearchParams();
   if (params.search) query.append('search', params.search);
